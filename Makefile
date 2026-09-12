@@ -1,6 +1,6 @@
 # LIBERO-CTRL
 # ★PY は LIBERO が動く python を指す。既定はこのリポジトリを開発した環境。
-PY ?= python
+PY ?= python3
 
 .PHONY: help smoke paper verify clean-out
 

@@ -125,9 +125,9 @@ def main():
                 L.append(f"| {lv} | - | - | - |")
             else:
                 L.append(f"| {lv} | {d['pred']*100:.1f}% | {d['obs']*100:.1f}% | {d['diff']*100:+.1f} |")
-    open(os.path.join(ROOT, "analysis", "summary.md"), "w").write("\n".join(L) + "\n")
+    open(os.path.join(OUT_DIR, "summary.md"), "w").write("\n".join(L) + "\n")
     print("\n".join(L[:60]))
-    print(f"\nsaved analysis/summary.json, analysis/summary.md  （モデル {len(S)} 本）")
+    print(f"\nsaved {OUT_DIR}/summary.json, {OUT_DIR}/summary.md  （モデル {len(S)} 本）")
 
 
 if __name__ == "__main__":
