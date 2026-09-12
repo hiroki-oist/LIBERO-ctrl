@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
-"""combination の成否を独立な再取得(repB)に差し替えて I を計算し直し、|ΔI| を出す。
+"""Recompute I with the combination outcomes replaced by an independent re-collection (repB),
+and report |dI|.
 
-単一6軸は原本のまま（repB は combination のみ）。したがってここで測っているのは
-「同時条件だけを独立に取り直したときに I がどれだけ動くか」。
+The six single axes stay as originally collected -- repB covers the combination axis only -- so
+what this measures is how far I moves when only the simultaneous condition is re-collected.
 """
 
 import os as _os
-# ★結果は results/paper/<run名>/rollouts.jsonl に統合済み（fuji と taketomi の両方を、
-#   taketomi 優先でマージ）。旧リポジトリの /tmp/tkpull による上書きはもう不要。
+# Results live at results/paper/<run>/rollouts.jsonl, already merged across the machines
+# they were collected on (see docs/RESULTS_INDEX.md for the merge rule).
 ROOT = _os.environ.get("LIBERO_CTRL_ROOT",
        _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))
 RESULTS = _os.path.join(ROOT, "results", "paper")
@@ -19,7 +20,7 @@ import json, glob, collections, sys
 import numpy as np
 AX = ("camera","lighting","robot","sensor","actuation","language")
 LV = ("L1","L2","L3")
-TK = {}   # 統合済みなので上書き元は無い
+TK = {}   # results are already merged; nothing to override with
 
 def load(dirs):
     o = {}
@@ -38,7 +39,8 @@ POL = [("VLA-JEPA", ["vlajepa_eval"], "vlajepa_repB"),
 
 def build(ev, override=None, restrict=None):
     """(suite,task,level,config) -> {axis: success}
-    restrict を渡すと、その鍵集合だけを残す（repB が未完了のときの取りこぼし防止）。"""
+    Passing `restrict` keeps only those keys, so that rows repB has not collected are not
+    silently counted as agreeing."""
     u = collections.defaultdict(dict)
     for r in ev.values():
         u[(r["suite"], r["task_id"], r["level"], r["config"])][r["axis"]] = r["success"]
@@ -61,7 +63,7 @@ def terms(u, L):
                 Sconj=100*len(a1)/N, Ssim=100*sum(u[k]["combination"] for k in keys)/N)
 
 def boot_ci(u1, u2, L, n=4000, seed=0):
-    """セル単位クラスタブートストラップで ΔI の CI"""
+    """Cluster bootstrap over cells, for a CI on dI."""
     keys = [k for k in u1 if k[2] == L and len(u1[k]) == 7 and len(u2.get(k, {})) == 7]
     cells = sorted({(k[0], k[1]) for k in keys})
     bycell = collections.defaultdict(list)
@@ -80,16 +82,16 @@ def boot_ci(u1, u2, L, n=4000, seed=0):
     bs = [dI([cells[i] for i in rng.integers(0, len(cells), len(cells))]) for _ in range(n)]
     return np.nanpercentile(bs, [2.5, 97.5])
 
-print(f"{'policy':10s} {'L':3s} {'n':>5s} {'不一致':>7s} {'b/c':>9s} | {'I(原本)':>8s} {'I(repB)':>8s} {'ΔI':>7s} {'95%CI on ΔI':>18s}")
+print(f"{'policy':10s} {'L':3s} {'n':>5s} {'mismatch':>9s} {'b/c':>9s} | {'I(orig)':>8s} {'I(repB)':>8s} {'dI':>7s} {'95%CI on dI':>18s}")
 print("-"*95)
 for name, ed, rd in POL:
     ev = load(ed); rp = load([rd])
-    if not rp: print(f"{name:10s} (repB 未取得)"); continue
-    # ★repB が持っている鍵だけで比較する。未取得分を「一致」に数えないため。
+    if not rp: print(f"{name:10s} (repB not collected)"); continue
+    # Compare only on the keys repB actually has, so uncollected rows are not counted as agreeing.
     got = {(r["suite"], r["task_id"], r["level"], r["config"]) for r in rp.values()}
     u0 = build(ev, restrict=got); u1 = build(ev, rp, restrict=got)
     ntot = len([k for k in u0 if len(u0[k]) == 7])
-    print(f"{name:10s} repB 取得 {len(rp)} 行 / 照合可能 {ntot} セル")
+    print(f"{name:10s} repB has {len(rp)} rows / {ntot} cells comparable")
     for L in LV:
         t0 = terms(u0, L); t1 = terms(u1, L)
         if not t0 or not t1: continue

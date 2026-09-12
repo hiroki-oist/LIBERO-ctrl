@@ -1,7 +1,9 @@
-"""軸6 Actuation Error。「そこへ動かそうとしたが系統誤差で行かない」を action 変換で作る。
+"""Axis 6, actuation error: "the policy commanded that motion and systematic error kept it
+from happening", expressed as a transform on the action.
 
-ゲイン誤差・固定バイアス・座標系の軸ずれ・一次遅れ・ランダムノイズ。model には触らない。
-値域は実機（Franka Panda / SO-101 級）であり得る範囲に絞ってある。
+Gain error, constant bias, axis misalignment, first-order lag and random noise. The model is
+untouched. The ranges are restricted to what is plausible on real hardware of the Franka Panda
+or SO-101 class.
 """
 from . import Perturbation, PerturbSpec
 
@@ -19,5 +21,5 @@ class ActuationPerturb(Perturbation):
         self._e = ActuationError(self.params, seed=seed, suite=self.suite)
 
     def transform_action(self, a):
-        if self._e is None: raise RuntimeError("reset(seed) を先に呼ぶこと")
+        if self._e is None: raise RuntimeError("call reset(seed) first")
         return self._e(a)

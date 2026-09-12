@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
-"""tab:decomp を厳密に生成する。
+"""Generate tab:decomp exactly.
 
-★I は 100*(c-b)/N の整数比で出す。100*(S_sim - S_conj) と書くと
-  0.2875-0.15 = 0.13749999999999998 のような誤差で 0.1 ずれる（実際ずれていた）。
+I is computed as the integer ratio 100*(c-b)/N. Writing it as 100*(S_sim - S_conj) introduces
+float error -- 0.2875 - 0.15 = 0.13749999999999998 -- and the printed value comes out 0.1 off,
+which it actually did.
 """
 
 import os as _os
-# ★結果は results/paper/<run名>/rollouts.jsonl に統合済み（fuji と taketomi の両方を、
-#   taketomi 優先でマージ）。旧リポジトリの /tmp/tkpull による上書きはもう不要。
+# Results live at results/paper/<run>/rollouts.jsonl, already merged across the machines
+# they were collected on (see docs/RESULTS_INDEX.md for the merge rule).
 ROOT = _os.environ.get("LIBERO_CTRL_ROOT",
        _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))
 RESULTS = _os.path.join(ROOT, "results", "paper")
@@ -50,7 +51,7 @@ for name,ed,cd in POL:
         N,b,c,na1,nsim,Sa=counts(u,ks)
         Sp=S0*np.prod([Sa[a]/S0 for a in AX]); Si=float(np.prod([Sa[a] for a in AX]))
         Sc=na1/N; Ss=nsim/N
-        I=100*(c-b)/N                      # ★整数比で厳密に
+        I=100*(c-b)/N                      # exact, as an integer ratio
         B=100*(Si-Sp); D=100*(Sc-Si); res=100*(Ss-Sp)
         bycell=collections.defaultdict(list)
         for k in ks: bycell[(k[0],k[1])].append(k)
@@ -61,9 +62,10 @@ for name,ed,cd in POL:
             n2,b2,c2,_,_,_=counts(u,kk); bs.append(100*(c2-b2)/n2)
         lo,hi=np.percentile(bs,[2.5,97.5])
         p=2*min((np.array(bs)>0).mean(),(np.array(bs)<0).mean())
-        if lo==hi==0.0: p=1.0          # 全リサンプルが厳密に 0 の退化ケース
+        if lo==hi==0.0: p=1.0          # degenerate: every resample is exactly 0
         rows.append(dict(pol=name,L=L,res=res,B=B,D=D,I=I,lo=lo,hi=hi,p=p,Sp=100*Sp,N=N,b=b,c=c))
-DAG={("SmolVLA","L2"),("$\\pi_{0.5}$","L2")}   # 独立再取得で有意性が持ち越されなかったセル
+DAG={("SmolVLA","L2"),("$\\pi_{0.5}$","L2")}   # cells whose significance did not survive
+                                              # independent re-collection
 def f(x,d=1): return f"${x:+.{d}f}$"
 print("\\begin{table*}[t]")
 print("\\centering")

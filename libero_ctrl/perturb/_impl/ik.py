@@ -1,9 +1,7 @@
-"""EEF 空間の減衰最小二乗 IK。
+"""Damped least-squares IK in end-effector space.
 
-★calibration/lib_ctrl.py から実行時に必要な部分だけを抜き出したもの。
-  元ファイルは module 直下で torch と libero を import するため、摂動を当てるだけの
-  用途には重すぎた。ここは numpy + mujoco しか要求しない。
-  導出の経緯は calibration/lib_ctrl.py を参照（実行時には不要）。
+Only the part needed at run time. It requires numpy and mujoco and nothing else, so that
+applying a perturbation does not drag in torch or the calibration tooling.
 """
 import numpy as np
 import mujoco as _mj
@@ -28,8 +26,11 @@ def eef_pose(T, st):
     return T.sim.data.site_xpos[s].copy(), T.sim.data.site_xmat[s].copy().reshape(3,3)
 
 def perturb_robot_eef(T, st, dpos, drot, iters=200, lam=0.08):
-    """EEF を dpos[m] 平行移動 / drot[rad, axis-angle] 回転させる関節角を IK で求める。
-    戻り値: (新しい init state, 位置誤差[m], 姿勢誤差[deg], 関節リミットに当たった数)"""
+    """Solve for the joint angles that translate the end effector by dpos (m) and rotate it by
+    drot (rad, axis-angle).
+
+    Returns (new init state, position residual [m], orientation residual [deg], number of
+    joints that hit a limit)."""
     m,sim=T.m,T.sim; s=_grip_site(T)
     p0,R0=eef_pose(T,st)
     pt=p0+np.asarray(dpos); Rt=_axisangle2mat(np.asarray(drot))@R0

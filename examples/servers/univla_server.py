@@ -1,69 +1,72 @@
-"""UniVLA を別プロセスで常駐させ、我々の env から呼べるようにする。
+"""Serve UniVLA from its own process.
 
-UniVLA (arXiv:2505.06111, OpenDriveLab) は LeRobot に実装が無く、OpenVLA の prismatic
-コードベースを使う。**flow matching ではなく自己回帰で潜在行動トークンを生成**し、
-小さな ActionDecoder で 7 次元行動に落とす。我々の5モデルは全部 flow matching なので、
-機構の多様性を確保するための1本。
+UniVLA (arXiv:2505.06111) has no LeRobot implementation and uses OpenVLA's prismatic codebase.
+It generates latent action tokens autoregressively rather than by flow matching, and decodes
+them to a 7-dimensional action with a small ActionDecoder. It is included precisely because the
+other large policies evaluated here are flow-matching models, and mechanism diversity matters.
 
-**依存（PLAN.md §19.3.1）**
-  torch 2.7.0+cu128 / transformers 4.40.1 / timm 0.9.10  ← RTX 5090 (sm_120) で動く最小構成
-  `prismatic/__init__.py` は draccus と tensorflow/dlimp を引くので**通さない**。
-  `extern/hf/` の4ファイルを univla_env/pmin/ に切り出して直接 import する。
+Dependencies
+  torch 2.7.0+cu128 / transformers 4.40.1 / timm 0.9.10 -- the minimal set that runs on
+  sm_120 hardware. `prismatic/__init__.py` is deliberately not imported, because it pulls in
+  draccus and tensorflow/dlimp; the four files from `extern/hf/` are extracted into a minimal
+  package and imported directly.
 
-**推論経路（公式 experiments/robot/libero/run_libero_eval.py に忠実）**
-  agentview のみ（wrist は使わない）
-    -> center crop 面積 0.9 倍 -> 元サイズへ戻す（公式は TF。ここでは等価な torch 実装）
+Inference path, faithful to the official experiments/robot/libero/run_libero_eval.py:
+  agentview only (the wrist camera is unused)
+    -> center crop to 0.9 of the area, resized back (the original uses TF; an equivalent torch
+       implementation is used here)
     -> prompt "In: What action should the robot take to {task}?\nOut:"
     -> vla.predict_latent_action(do_sample=True, temperature=0.75, top_p=0.9)
-    -> ActionDecoder(window_size=12): 潜在行動の**末尾4トークン**を visual_embed 条件で MAP pool
-    -> 7*12 の行動チャンク -> 指数重み(0.1)の時間アンサンブル -> norm_stats で逆正規化
+    -> ActionDecoder(window_size=12): MAP-pool the last four latent action tokens, conditioned
+       on visual_embed
+    -> a 7x12 action chunk -> exponential temporal ensembling (0.1) -> unnormalise via norm_stats
 
-**★スイートごとに checkpoint が違う**（univla-libero-{spatial,object,goal,10}）。
-  --ckpt でスイート専用ディレクトリを指す。unnorm_key も同じスイート名を使う。
+**There is a different checkpoint per suite** (univla-libero-{spatial,object,goal,10}).
+Point --ckpt at the suite's directory; unnorm_key uses the same suite name.
 
-  起動: univla_env/.venv/bin/python examples/servers/univla_server.py \
-          --sock /tmp/uv_0.sock --ckpt ckpt_local/univla-libero/univla-libero-spatial \
-          --suite libero_spatial
+  start:  <univla venv>/bin/python examples/servers/univla_server.py \
+            --sock /tmp/uv_0.sock --ckpt <path>/univla-libero-spatial \
+            --suite libero_spatial
 """
 import os, sys, argparse, socket, traceback
 
 for _v in ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS",
            "NUMEXPR_NUM_THREADS", "VECLIB_MAXIMUM_THREADS"):
     os.environ.setdefault(_v, "1")
-# ★7.54B を1枚に2本載せると 31.3/32.6GB になり断片化の余地が無い。
-#   expandable_segments で確保済みブロックを伸縮させ、予約の無駄を減らす。
+# Two 7.54B servers on one 32.6 GB card come to 31.3 GB, leaving no room for fragmentation.
+# expandable_segments lets allocated blocks grow and shrink, wasting less on reservations.
 os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
 import numpy as np, torch
 torch.set_num_threads(1)
 torch.set_num_interop_threads(1)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-# ★通信プロトコルは libero_ctrl/policy/wire.py が正準（コピーを増やさない）。
-#   サーバは方策側の venv で動くのでパッケージとしては import せず、ファイルだけを読む。
+# libero_ctrl/policy/wire.py is the single copy of the wire protocol. The server runs in the
+# policy's venv, so the module file is loaded directly rather than importing the package.
 sys.path.insert(0, os.path.join(os.environ.get("LIBERO_CTRL_ROOT",
     os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))),
     "libero_ctrl", "policy"))
 from wire import send, recv
 
-UNIVLA_ENV = os.environ.get("UNIVLA_ENV", "/home/hiroki/Code/LIBERO-ctrl/univla_env")
-sys.path.insert(0, UNIVLA_ENV)                      # pmin/（最小 prismatic）
-sys.path.insert(0, os.path.join(UNIVLA_ENV, "UniVLA"))  # MAPBlock 等
+UNIVLA_ENV = os.environ.get("UNIVLA_ENV", os.path.expanduser("~/univla_env"))
+sys.path.insert(0, UNIVLA_ENV)                      # the minimal prismatic package
+sys.path.insert(0, os.path.join(UNIVLA_ENV, "UniVLA"))  # MAPBlock and friends
 
 
 def preprocess_image(img_u8: np.ndarray, crop_scale: float = 0.9, resize: int = 224) -> np.ndarray:
-    """公式 get_libero_image + crop_and_resize と等価な前処理。
+    """Equivalent to the official get_libero_image + crop_and_resize.
 
-    ★手順（experiments/robot/libero/libero_utils.py get_libero_image）:
-      1. `img[::-1, ::-1]` で **180度回転**
-         公式コメント: "IMPORTANT: rotate 180 degrees to match train preprocessing"
-      2. resize_size（openvla は **224**）へリサイズ
-      3. center crop 面積 0.9 倍 -> 元サイズ(224)へ戻す（cfg.center_crop=True が既定）
+    The official steps (experiments/robot/libero/libero_utils.py, get_libero_image):
+      1. `img[::-1, ::-1]`, a 180-degree rotation. Their comment reads
+         "IMPORTANT: rotate 180 degrees to match train preprocessing".
+      2. resize to resize_size (224 for openvla).
+      3. center crop to 0.9 of the area, resized back to 224 (cfg.center_crop=True by default).
 
-    公式は TF（tf.image.crop_and_resize）でやっているが、TF を入れると
-    `import timm` が segfault する（PLAN.md §19.3）。等価な torch 実装にする。
-    辺の比は **sqrt(crop_scale)**（面積比ではない）。公式のコメントにも明記されている。
+    The original does this in TF (tf.image.crop_and_resize), but installing TF makes
+    `import timm` segfault in this environment, so an equivalent torch implementation is used.
+    The side ratio is sqrt(crop_scale), not the area ratio -- as their own comment states.
     """
     import torch.nn.functional as F
-    img_u8 = img_u8[::-1, ::-1]                      # ★180度回転（学習時の前処理に合わせる）
+    img_u8 = img_u8[::-1, ::-1]                      # 180-degree rotation, matching training
     x0 = torch.from_numpy(np.ascontiguousarray(img_u8)).permute(2, 0, 1)[None].float()
     x0 = F.interpolate(x0, size=(resize, resize), mode="bilinear", align_corners=False)
     img_u8 = x0[0].permute(1, 2, 0).round().clamp(0, 255).to(torch.uint8).numpy()
@@ -74,7 +77,7 @@ def preprocess_image(img_u8: np.ndarray, crop_scale: float = 0.9, resize: int = 
     l = (W - w) // 2
     crop = img_u8[t:t + h, l:l + w]
     x = torch.from_numpy(np.ascontiguousarray(crop)).permute(2, 0, 1)[None].float()
-    # TF の crop_and_resize は既定で bilinear、align_corners 相当の挙動
+    # TF's crop_and_resize defaults to bilinear and behaves like align_corners
     x = F.interpolate(x, size=(H, W), mode="bilinear", align_corners=False)
     return x[0].permute(1, 2, 0).round().clamp(0, 255).to(torch.uint8).numpy()
 
@@ -94,10 +97,10 @@ def build(ckpt: str, device: str, window_size: int):
         ckpt, torch_dtype=torch.bfloat16, low_cpu_mem_usage=True, trust_remote_code=True
     ).to(device).eval()
 
-    # ActionDecoder は公式スクリプトの定義をそのまま使う。
-    # ★MAPBlock も `prismatic.models.policy...` から取ると `prismatic/__init__` が走って
-    #   draccus を引く（2026-09-06 00:05 に踏んだ）。transformer_utils.py も pmin/ に
-    #   コピーして直接 import する。中身は math/typing/torch/einops しか使わない。
+    # ActionDecoder is used exactly as the official script defines it.
+    # MAPBlock too: importing it from `prismatic.models.policy...` would execute
+    # `prismatic/__init__` and pull in draccus, so transformer_utils.py is copied into the
+    # minimal package and imported directly. It only needs math/typing/torch/einops.
     from pmin.transformer_utils import MAPBlock
     import torch.nn as nn
 
@@ -109,7 +112,7 @@ def build(ckpt: str, device: str, window_size: int):
             self.proj = nn.Sequential(nn.Linear(512, 7 * window_size), nn.Tanh())
 
         def forward(self, latent_action_tokens, visual_embed):
-            latent_action_tokens = latent_action_tokens[:, -4:]   # ★末尾4トークンだけ使う
+            latent_action_tokens = latent_action_tokens[:, -4:]   # only the last four tokens
             visual_embed = self.visual_pool(visual_embed)
             return self.proj(self.latent_action_pool(latent_action_tokens, init_embed=visual_embed))
 
@@ -153,39 +156,40 @@ def build(ckpt: str, device: str, window_size: int):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--sock", default="/tmp/univla.sock")
-    ap.add_argument("--ckpt", required=True, help="スイート専用ディレクトリ univla-libero-<suite>")
+    ap.add_argument("--ckpt", required=True, help="the suite directory univla-libero-<suite>")
     ap.add_argument("--suite", required=True, help="libero_spatial / libero_object / libero_goal / libero_10")
     ap.add_argument("--device", default="cuda")
-    ap.add_argument("--window_size", type=int, default=12, help="公式 eval の既定は 12")
-    ap.add_argument("--seed", type=int, default=7, help="公式 eval の既定は 7。**推論が確率的なので固定する**")
+    ap.add_argument("--window_size", type=int, default=12, help="official eval default is 12")
+    ap.add_argument("--seed", type=int, default=7,
+                    help="official eval default is 7; inference samples, so this is pinned")
     a = ap.parse_args()
 
     torch.manual_seed(a.seed); np.random.seed(a.seed)
     vla, proc, dec = build(a.ckpt, a.device, a.window_size)
 
-    # ★逆正規化の統計は checkpoint 同梱の `dataset_statistics.json` にある。
-    #   `vla.norm_stats`（config.json 由来）は OXE 事前学習データセットの統計で
-    #   LIBERO のキーを含まない（2026-09-06 00:07 に KeyError で踏んだ）。
+    # The unnormalisation statistics live in the checkpoint's own dataset_statistics.json.
+    # `vla.norm_stats` (from config.json) holds the OXE pretraining statistics and contains no
+    # LIBERO key at all, which raises KeyError if used.
     import json as _json
     _ds = _json.load(open(os.path.join(a.ckpt, "dataset_statistics.json")))
     key = a.suite if a.suite in _ds else f"{a.suite}_no_noops"
     if key not in _ds:
         key = list(_ds)[0]
-    # 逆正規化は q01/q99 と mask（末尾のグリッパ次元は正規化しない）
+    # Unnormalisation uses q01/q99 and a mask; the trailing gripper dimension is left alone.
     st = _ds[key]["action"]
     A_LOW = np.array(st["q01"], dtype=np.float64)
     A_HIGH = np.array(st["q99"], dtype=np.float64)
     A_MASK = np.array(st.get("mask", [True] * 6 + [False]), dtype=bool)
-    print(f"読み込み完了 ckpt={a.ckpt} suite={a.suite} unnorm_key={key} "
+    print(f"loaded ckpt={a.ckpt} suite={a.suite} unnorm_key={key} "
           f"params={sum(p.numel() for p in vla.parameters())/1e9:.2f}B window={a.window_size}", flush=True)
 
-    DETOK = [f"<ACT_{i}>" for i in range(32)]   # 公式 run_libero_eval.py L231
-    hist = [""]                                  # 直前ステップの潜在行動トークン列
+    DETOK = [f"<ACT_{i}>" for i in range(32)]   # official run_libero_eval.py L231
+    hist = [""]                                  # the previous step's latent action tokens
 
     if os.path.exists(a.sock): os.unlink(a.sock)
     srv = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     srv.bind(a.sock); srv.listen(1)
-    print(f"待機中: {a.sock}", flush=True)
+    print(f"listening on: {a.sock}", flush=True)
     while True:
         conn, _ = srv.accept()
         try:
@@ -197,17 +201,18 @@ def main():
                     send(conn, dict(ok=True, params=sum(p.numel() for p in vla.parameters())))
                 elif cmd == "reset":
                     dec.reset()
-                    hist.clear(); hist.append("")   # ★prompt に入れる履歴もリセット
+                    hist.clear(); hist.append("")   # also reset the history put in the prompt
                     torch.manual_seed(a.seed); np.random.seed(a.seed)
                     send(conn, dict(ok=True))
                 elif cmd == "act":
                     from PIL import Image
-                    # ★agentview のみ。UniVLA は wrist を使わない
+                    # agentview only; UniVLA does not use the wrist camera
                     img = preprocess_image(arr["agentview"])
                     task = h["task"].lower()
-                    # ★直前ステップの潜在行動トークン（<ACT_0>..<ACT_31>）を prompt に入れる。
-                    #   公式 run_libero_eval.py は get_latent_action(..., hist_action=prev_hist_action[-1])
-                    #   としており、これが時間方向の条件付けになっている。落とすと性能が出ない。
+                    # Put the previous step's latent action tokens (<ACT_0>..<ACT_31>) into
+                    # the prompt. The official run_libero_eval.py does this via
+                    # get_latent_action(..., hist_action=prev_hist_action[-1]); it is the
+                    # temporal conditioning, and dropping it costs accuracy.
                     ha = hist[-1]
                     if len(ha) > 0:
                         prompt = (f"In: What action should the robot take to {task}? "
@@ -217,32 +222,32 @@ def main():
                     inputs = proc(prompt, Image.fromarray(img).convert("RGB")).to(
                         vla.device, dtype=torch.bfloat16)
                     with torch.inference_mode():
-                        # ★3値を返す: (latent_action, visual_embed, generated_ids)
-                        # ★3値を返す: (latent_action, visual_embed, generated_ids)
+                        # returns three values: (latent_action, visual_embed, generated_ids)
                         lat, vis, gen = vla.predict_latent_action(
                             **inputs, unnorm_key=key, do_sample=True, temperature=0.75, top_p=0.9)
-                        # ★do_sample=True なので潜在行動語彙 32001..32032 の外のトークンが
-                        #   混じることがある（EOS など）。そのまま添字にすると IndexError で
-                        #   サーバが例外を返し**ワーカーが落ちる**（2026-09-07 14:03 に
-                        #   taketomi の libero_10 t1-t4 が全滅）。負値は黙って逆側を指すので
-                        #   範囲を明示して弾く。履歴からは落とすだけにする。
+                        # With do_sample=True, tokens outside the latent action vocabulary
+                        # 32001..32032 (EOS, for instance) sometimes appear. Indexing with
+                        # them raises IndexError, the server returns an exception and the
+                        # worker dies -- this once wiped out four whole tasks. Negative values
+                        # silently index from the other end, so the range is checked
+                        # explicitly and out-of-range tokens are dropped from the history.
                         hist.append("".join(DETOK[int(i) - 32001] for i in gen[0]
                                             if 32001 <= int(i) <= 32032))
                         act = dec(lat, vis, A_MASK, A_LOW, A_HIGH)
-                    # ★グリッパ: normalize [0,1]->[-1,1] -> 二値化 -> 符号反転（公式と同順）
+                    # gripper: normalise [0,1]->[-1,1], binarise, invert -- the official order
                     act = np.asarray(act, dtype=np.float64)
                     act[-1] = 2 * act[-1] - 1
                     act[-1] = 1.0 if act[-1] > 0 else -1.0
                     act[-1] = -act[-1]
                     send(conn, dict(ok=True), dict(action=np.asarray(act, dtype=np.float32)))
                 else:
-                    send(conn, dict(ok=False, err=f"未知のコマンド {cmd}"))
+                    send(conn, dict(ok=False, err=f"unknown command {cmd}"))
         except Exception as e:
             traceback.print_exc()
             try: send(conn, dict(ok=False, err=traceback.format_exc()[-2000:]))
             except Exception: pass
             if "CUDA error" in str(e) or "AcceleratorError" in type(e).__name__:
-                print("★CUDA コンテキストが壊れたのでサーバを終了する", flush=True)
+                print("CUDA context is broken; shutting the server down", flush=True)
                 try: os.unlink(a.sock)
                 except Exception: pass
                 os._exit(1)

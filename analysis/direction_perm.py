@@ -1,14 +1,16 @@
-"""摂動の向きと創発/補償の相関を、設計に整合した 10,000 回の置換で較正する。
+"""Calibrate the correlation between perturbation direction and emergence/compensation against
+a design-consistent permutation null, 10,000 draws.
 
-置換の設計:
-  ・(suite,task) セル内で config を並べ替える（タスク難易度は保存）
-  ・**全方策に同一の並べ替えを適用**する。config は方策間で共有されているので、
-    独立にシャッフルすると configuration difficulty 由来の方策間共分散が壊れる。
+How the permutation is built:
+  - configs are permuted within a (suite, task) cell, which preserves task difficulty;
+  - **the same permutation is applied to every policy.** Configs are shared across policies, so
+    shuffling them independently would destroy the between-policy covariance that comes from
+    configuration difficulty.
 """
 
 import os as _os
-# ★結果は results/paper/<run名>/rollouts.jsonl に統合済み（fuji と taketomi の両方を、
-#   taketomi 優先でマージ）。旧リポジトリの /tmp/tkpull による上書きはもう不要。
+# Results live at results/paper/<run>/rollouts.jsonl, already merged across the machines
+# they were collected on (see docs/RESULTS_INDEX.md for the merge rule).
 ROOT = _os.environ.get("LIBERO_CTRL_ROOT",
        _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))
 RESULTS = _os.path.join(ROOT, "results", "paper")
@@ -20,7 +22,7 @@ import json, glob, collections, itertools
 import numpy as np
 AX=("camera","lighting","robot","sensor","actuation","language"); LV=("L1","L2","L3")
 tk=collections.defaultdict(list)
-# 統合済みなので追加の読み込み元は無い
+# results are already merged; nothing else to read
 def load(ds):
     o={}
     for d in ds:
@@ -69,7 +71,7 @@ def run(tgt,cond):
             cells.append((n,L,T,y,[np.array(v) for v in grp.values()]))
     obs=np.array([ (c[2].T@((c[3]-c[3].mean())/(c[3].std()+1e-12)))/len(c[3]) for c in cells])
     una=int(((obs>0).all(0)|(obs<0).all(0)).sum())
-    # 同一の並べ替えを全セルに適用（タスクセル内で config を入替）
+    # apply the same permutation everywhere, swapping configs within a task cell
     null=np.zeros(NP_,int)
     Yp=[np.empty((len(c[3]),NP_)) for c in cells]
     for ci,c in enumerate(cells):
@@ -90,14 +92,14 @@ def run(tgt,cond):
     return cells,obs,una,null
 cb,ob_,ua,nb=run("b",("b","ok"))
 cc,oc_,uc,nc=run("c",("c","ng"))
-print(f"創発 b: {len(cb)} セル、全一致 {ua} 対 / {len(pairs)}")
-print(f"  帰無（10,000 置換、設計整合）: 平均 {nb.mean():.3f}  95%点 {np.percentile(nb,95):.0f}  "
-      f"最大 {nb.max()}  経験 p = {(nb>=ua).mean():.4f}")
-print(f"補償 c: {len(cc)} セル、全一致 {uc} 対")
-print(f"  帰無: 平均 {nc.mean():.3f}  最大 {nc.max()}  経験 p = {(nc>=max(uc,1)).mean():.4f}")
+print(f"emergent b: {len(cb)} cells, {ua} of {len(pairs)} pairs agree across all policies")
+print(f"  null (10,000 design-consistent permutations): mean {nb.mean():.3f}  "
+      f"95th pct {np.percentile(nb,95):.0f}  max {nb.max()}  empirical p = {(nb>=ua).mean():.4f}")
+print(f"compensated c: {len(cc)} cells, {uc} pairs agree across all policies")
+print(f"  null: mean {nc.mean():.3f}  max {nc.max()}  empirical p = {(nc>=max(uc,1)).mean():.4f}")
 if ua:
-    print("\n  全一致した対:")
+    print("\n  pairs that agree across all policies:")
     for j in sorted(np.where((ob_>0).all(0)|(ob_<0).all(0))[0], key=lambda j:-abs(ob_[:,j].mean())):
         i1,i2=pairs[j]
-        print(f"    {FEAT[i1]:26s} × {FEAT[i2]:24s} 平均r={ob_[:,j].mean():+.3f}  "
-              f"補償側 {oc_[:,j].mean():+.3f} ({max((oc_[:,j]>0).sum(),(oc_[:,j]<0).sum())}/{len(cc)})")
+        print(f"    {FEAT[i1]:26s} x {FEAT[i2]:24s} mean r={ob_[:,j].mean():+.3f}  "
+              f"compensated {oc_[:,j].mean():+.3f} ({max((oc_[:,j]>0).sum(),(oc_[:,j]<0).sum())}/{len(cc)})")

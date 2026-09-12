@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
-"""方策ごとに1パネル、軸ごとに1本の線。tab:axes の 147 個の数字を 7 つの指紋にする。
+"""One panel per policy, one line per axis: the 147 numbers of tab:axes as seven fingerprints.
 
-  x = clean, L1, L2, L3        y = 成功率 (%)
-  色付きの線 = 単一6軸、太い黒線 = 6軸同時
-各パネルは同じ y 軸なので、パネル間で「最悪の軸が違う」ことがそのまま見える。
+  x = clean, L1, L2, L3        y = success rate (%)
+  coloured lines = the six single axes, bold black = all six simultaneously
+Every panel shares a y axis, so "which axis is worst" being different per policy is visible
+directly.
 """
 
 import os as _os
-# ★結果は results/paper/<run名>/rollouts.jsonl に統合済み（fuji と taketomi の両方を、
-#   taketomi 優先でマージ）。旧リポジトリの /tmp/tkpull による上書きはもう不要。
+# Results live at results/paper/<run>/rollouts.jsonl, already merged across the machines
+# they were collected on (see docs/RESULTS_INDEX.md for the merge rule).
 ROOT = _os.environ.get("LIBERO_CTRL_ROOT",
        _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))
 RESULTS = _os.path.join(ROOT, "results", "paper")
@@ -64,4 +65,4 @@ axes[1][3].legend(h, l, loc="center", fontsize=9, frameon=False, handlelength=1.
 fig.tight_layout(pad=0.6)
 out=f"{OUT_DIR}/policy_profiles.pdf"
 fig.savefig(out, bbox_inches="tight"); fig.savefig(out.replace(".pdf",".png"), dpi=160, bbox_inches="tight")
-print("書き出し:", out)
+print("written:", out)

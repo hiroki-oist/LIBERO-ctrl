@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
-"""combination も単一6軸も独立に取り直したデータから I を計算し、原本と比べる。
+"""Recompute I from data where both the six single axes and the combination were collected
+independently, and compare against the original.
 
-  原本  : results/<m>_eval          （全7条件）
-  完全版: results/<m>_axB (6軸) + results/<m>_repB (combination)
+  original    : results/paper/<m>_eval                     (all seven conditions)
+  independent : results/paper/<m>_axB (six single axes)
+              + results/paper/<m>_repB (combination)
 """
 
 import os as _os
-# ★結果は results/paper/<run名>/rollouts.jsonl に統合済み（fuji と taketomi の両方を、
-#   taketomi 優先でマージ）。旧リポジトリの /tmp/tkpull による上書きはもう不要。
+# Results live at results/paper/<run>/rollouts.jsonl, already merged across the machines
+# they were collected on (see docs/RESULTS_INDEX.md for the merge rule).
 ROOT = _os.environ.get("LIBERO_CTRL_ROOT",
        _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))
 RESULTS = _os.path.join(ROOT, "results", "paper")
@@ -49,13 +51,13 @@ def boot(u0, u1, L, keys, n=4000, seed=0):
         out.append(terms(u1, L, ks)[0] - terms(u0, L, ks)[0])
     return np.percentile(out, [2.5, 97.5])
 MODELS = sys.argv[1:] or ["vlajepa", "pi05", "smolvla"]
-print(f"{'policy':10s} {'L':3s} {'n':>5s} | {'I(原本)':>8s} {'I(完全独立)':>11s} {'ΔI':>7s} {'95%CI':>16s} | {'b→b':>9s} {'c→c':>9s}")
+print(f"{'policy':10s} {'L':3s} {'n':>5s} | {'I(orig)':>8s} {'I(indep)':>11s} {'dI':>7s} {'95%CI':>16s} | {'b->b':>9s} {'c->c':>9s}")
 print("-"*95)
 for m in MODELS:
     orig = units(load([f"{m}_eval"]))
     ax = load([f"{m}_axB"]); rp = load([f"{m}_repB"])
     if not ax or not rp:
-        print(f"{m:10s} (未完了: axB {len(ax)} / repB {len(rp)})"); continue
+        print(f"{m:10s} (incomplete: axB {len(ax)} / repB {len(rp)})"); continue
     new = units({**ax, **rp})
     for L in LV:
         keys = [k for k in orig if k[2] == L and len(orig[k]) == 7 and len(new.get(k, {})) == 7]

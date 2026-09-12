@@ -1,8 +1,9 @@
-"""原稿に載せる数値を1か所で計算する。転記ミスを避けるため本文の数値はすべてここから取る。"""
+"""Compute every number the paper reports, in one place, so that none of them is transcribed
+by hand."""
 
 import os as _os
-# ★結果は results/paper/<run名>/rollouts.jsonl に統合済み（fuji と taketomi の両方を、
-#   taketomi 優先でマージ）。旧リポジトリの /tmp/tkpull による上書きはもう不要。
+# Results live at results/paper/<run>/rollouts.jsonl, already merged across the machines
+# they were collected on (see docs/RESULTS_INDEX.md for the merge rule).
 ROOT = _os.environ.get("LIBERO_CTRL_ROOT",
        _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))
 RESULTS = _os.path.join(ROOT, "results", "paper")
@@ -13,7 +14,7 @@ _os.makedirs(OUT_DIR, exist_ok=True)
 import json,glob,collections,random,itertools
 import numpy as np
 AX=("camera","lighting","robot","sensor","actuation","language")
-tk=collections.defaultdict(list)   # 統合済みなので追加の読み込み元は無い
+tk=collections.defaultdict(list)   # results are already merged; nothing else to read
 def load(dirs):
     rows={}
     for d in dirs:
@@ -27,8 +28,8 @@ MODELS=[("MINERVA","0.54M",["minerva_clean"],["minerva_eval","minerva_comb"],95.
         ("pi05","4.14B",["pi05_clean"],["pi05_eval"],96.9),
         ("OpenVLA-OFT","7.54B",["oft_clean"],["oft_eval"],97.1),
         ("UniVLA","7.54B",["univla_clean"],["univla_eval"],95.2),
-        # ★PredVLA は公開 4 シードのうち主シード s13 を代表行にする（MINERVA と同じ扱い）。
-        #   残り 3 シードは §4.7 のシード分散に使う。
+        # PredVLA reports its primary seed (s13) as the representative row, as the other
+        # multi-seed policy does; the remaining three seeds feed the seed-variance section.
         ("PredVLA","0.68M",["predvla_s13_clean"],["predvla_s13_eval"],77.80)]
 SUITES=("libero_spatial","libero_object","libero_goal","libero_10")
 def binom2(b,c):
@@ -58,9 +59,9 @@ for name,sz,cd,ed,pub in MODELS:
     def m(ks,sel):
         t=[x for k in ks for x in cells[k].get(sel,[])]
         return sum(t)/len(t) if t else float("nan")
-    # 軸別 SR（完了セル限定）
+    # per-axis success rate, over completed cells only
     rec["axis_sr"]={a:{L:100*m(full,(a,L)) for L in ("L1","L2","L3")} for a in AX+("combination",)}
-    # 積モデル
+    # product model
     def dev(ks,L):
         c=m(ks,"clean"); p=c
         for a in AX: p*=m(ks,(a,L))/c
@@ -71,7 +72,7 @@ for name,sz,cd,ed,pub in MODELS:
         bs=sorted(dev([random.choice(full) for _ in full],L)[0] for _ in range(4000))
         p=2*min(sum(1 for b in bs if b>0),sum(1 for b in bs if b<0))/len(bs)
         rec["prod"][L]=dict(dev=pt,pred=pr,obs=ob,lo=bs[100],hi=bs[3899],p=p)
-    # 軌道レベル（AND）と分解 + McNemar
+    # trajectory level (AND), the decomposition, and McNemar
     tbl=collections.defaultdict(dict)
     for r in ev:
         if (r["suite"],r["task_id"]) in cells:
@@ -89,7 +90,7 @@ for name,sz,cd,ed,pub in MODELS:
                             cmp=100*c/(n-len(a1)) if n-len(a1) else float("nan"),
                             p=binom2(b,c))
     OUT[name]=rec
-# 集計指標
+# aggregate measures
 pts=[(OUT[n]["prod"][L]["pred"],OUT[n]["prod"][L]["obs"]) for n in OUT for L in OUT[n]["prod"]]
 pr=np.array([a for a,_ in pts]); ob=np.array([b for _,b in pts])
 AND=[(OUT[n]["conj"][L]["AND"],OUT[n]["conj"][L]["obs"]) for n in OUT for L in OUT[n]["conj"]]
@@ -97,9 +98,10 @@ ar=np.array([a for a,_ in AND]); ao=np.array([b for _,b in AND])
 sl=np.polyfit(pr,ob-pr,1)[0]
 emg=np.array([OUT[n]["conj"][L]["emg"] for n in OUT for L in OUT[n]["conj"]])
 cmp_=np.array([OUT[n]["conj"][L]["cmp"] for n in OUT for L in OUT[n]["conj"]])
-# ★emg は「6軸すべてに単独で耐えた行」が無いセルで nan になる（PredVLA の L2/L3）。落とす
+# emg is nan in cells with no row that survives all six axes individually; drop those
 ok=~(np.isnan(emg)|np.isnan(cmp_))
-# ★予測が床（<4%）のセルは符号付き残差が解像できないので、集計は両方報告する
+# cells whose prediction is on the floor (<4%) cannot resolve a signed residual, so the
+# aggregates are reported both with and without them
 res=np.array([p>=4 for p in pr])
 def agg(m):
     return dict(n=int(m.sum()), r=float(np.corrcoef(pr[m],ob[m])[0,1]),
@@ -116,7 +118,7 @@ for n in OUT:
           f"eval={100*r['eval_all'][0]/r['eval_all'][1]:.1f}")
     for L in ("L1","L2","L3"):
         d=r["prod"].get(L); j=r["conj"].get(L)
-        if d: print(f"   {L} 積: pred {d['pred']:5.1f} obs {d['obs']:5.1f} dev {d['dev']:+6.1f} "
+        if d: print(f"   {L} product: pred {d['pred']:5.1f} obs {d['obs']:5.1f} dev {d['dev']:+6.1f} "
                     f"[{d['lo']:+.1f},{d['hi']:+.1f}] p={d['p']:.3f}"
                     + (f" | AND {j['AND']:5.1f} b={j['b']} c={j['c']} emg={j['emg']:.1f} cmp={j['cmp']:.1f} pM={j['p']:.2e}" if j else ""))
-print("\n集計:", json.dumps(OUT["_agg"],indent=1))
+print("\naggregates:", json.dumps(OUT["_agg"],indent=1))

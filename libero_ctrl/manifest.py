@@ -1,7 +1,7 @@
-"""manifest（= 実験設計そのもの）を読むための小さな API。
+"""A small API over the manifest, which *is* the experiment design.
 
-manifest の 1 行が 1 rollout に対応し、行に含まれる情報だけで rollout が再現される。
-実行時に乱数を引かないのが設計の要で、seed は rollout_id から決定論的に導く。
+One manifest line is one rollout, and the line alone is enough to reproduce it. Nothing is
+sampled at run time: the seed is derived deterministically from the rollout id.
 """
 from __future__ import annotations
 import json, os, zlib
@@ -15,38 +15,43 @@ SUITES = ("libero_spatial", "libero_object", "libero_goal", "libero_10")
 AXES = ("camera", "lighting", "robot", "sensor", "actuation", "language", "combination")
 LEVELS = ("L1", "L2", "L3")
 SPLITS = {"clean": "rollouts_clean.jsonl", "eval": "rollouts_eval.jsonl"}
-#: severity 半径。正規化空間 Δp/σ のユークリッドノルム。
+#: Severity radius: the Euclidean norm of the normalised displacement (dp / sigma).
 SEVERITY_RADIUS = {"L1": 2.0, "L2": 4.0, "L3": 8.0}
 
 
 def severity_radius(level: str) -> float:
-    """level -> 半径。L3 の単一パラメータ方向は宣言した物理範囲の端に一致する。"""
+    """level -> radius. Along a single parameter, L3 coincides with the end of the declared
+    physical range for that parameter."""
     return SEVERITY_RADIUS[level]
 
 
 def rollout_seed(rollout_id: str) -> int:
-    """★安定ハッシュ。Python の hash() は起動ごとに変わるので使わない。"""
+    """A stable hash. Python's hash() is salted per process and must not be used here."""
     return zlib.crc32(rollout_id.encode())
 
 
 def _require_manifest() -> str:
     if not os.path.isdir(MANIFEST_DIR):
         raise SystemExit(
-            f"manifest が見つかりません: {MANIFEST_DIR}\n"
-            "  リポジトリ直下で `pip install -e .` してください（manifest はパッケージ外に置いてあります）。\n"
-            "  別の場所に置く場合は環境変数 LIBERO_CTRL_MANIFEST でディレクトリを指定してください。")
+            f"manifest not found: {MANIFEST_DIR}\n"
+            "  Run `pip install -e .` at the repository root -- the manifests live outside the\n"
+            "  Python package on purpose. To keep them elsewhere, point LIBERO_CTRL_MANIFEST at\n"
+            "  the directory.")
     return MANIFEST_DIR
 
 
 def protocol() -> dict:
-    """manifest.json の protocol ブロック（max_steps / num_steps_wait / env_seed）。"""
+    """The protocol block of manifest.json (max_steps / num_steps_wait / env_seed)."""
     with open(os.path.join(_require_manifest(), "manifest.json")) as f:
         return json.load(f)["protocol"]
 
 
 def env_seed() -> int:
-    """env を**構築する直前**に張るシード。★これを固定しないと什器（棚・コンロ等）の
-    配置が実行ごとに変わり、set_init_state では戻らないため再現できない。"""
+    """The seed applied immediately *before* the env is constructed.
+
+    Without it the fixtures (shelves, stoves, cabinets) are placed differently on every run,
+    and set_init_state does not bring them back, because they are not in the state vector.
+    Nothing about the benchmark reproduces if this is not pinned."""
     return int(protocol()["env_seed"])
 
 
@@ -61,12 +66,12 @@ def load_rows(split: str = "eval") -> list[dict]:
 
 def iter_rows(split: str = "eval", *, axis=None, level=None, suite=None,
               task_id=None) -> Iterator[dict]:
-    """条件で絞った manifest 行を返す。
+    """Manifest rows, filtered.
 
-      iter_rows(axis="camera", level="L2")          -> 400 行（単一軸 1 水準）
-      iter_rows(level="L1")                         -> 2,800 行（全 7 条件 1 水準）
-      iter_rows()                                   -> 8,400 行（フル）
-      iter_rows("clean")                            -> 2,000 行（摂動なし）
+      iter_rows(axis="camera", level="L2")          ->   400 rows (one axis, one level)
+      iter_rows(level="L1")                         -> 2,800 rows (all seven conditions, L1)
+      iter_rows()                                   -> 8,400 rows (everything)
+      iter_rows("clean")                            -> 2,000 rows (nominal)
     """
     def ok(r, key, want):
         if want is None: return True

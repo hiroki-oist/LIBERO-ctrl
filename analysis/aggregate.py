@@ -1,14 +1,14 @@
-"""結果 jsonl を集計して、論文用の表と図の元データを作る。
+"""Aggregate the result jsonl files into the source data for the paper's tables and figures.
 
-出力:
-  analysis/summary.json   モデル × 軸 × レベルの成功率と件数
-  analysis/summary.md     人が読む表
-GPU を使わないので評価と並行して回せる。
+Outputs:
+  analysis/out/summary.json   success rate and count per policy x axis x level
+  analysis/out/summary.md     the same as a human-readable table
+It uses no GPU, so it can run alongside an evaluation.
 """
 
 import os as _os
-# ★結果は results/paper/<run名>/rollouts.jsonl に統合済み（fuji と taketomi の両方を、
-#   taketomi 優先でマージ）。旧リポジトリの /tmp/tkpull による上書きはもう不要。
+# Results live at results/paper/<run>/rollouts.jsonl, already merged across the machines
+# they were collected on (see docs/RESULTS_INDEX.md for the merge rule).
 ROOT = _os.environ.get("LIBERO_CTRL_ROOT",
        _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))
 RESULTS = _os.path.join(ROOT, "results", "paper")
@@ -24,7 +24,7 @@ RES = RESULTS
 AXES = ["camera", "lighting", "robot", "sensor", "actuation", "language", "combination"]
 LEVELS = ["L1", "L2", "L3"]
 SUITES = ["libero_spatial", "libero_object", "libero_goal", "libero_10"]
-# 結果ディレクトリ名 -> (モデル名, split)
+# result directory name -> (policy name, split)
 def discover():
     out = collections.defaultdict(dict)
     for d in sorted(glob.glob(os.path.join(RES, "*"))):
@@ -38,12 +38,12 @@ def discover():
 
 
 def load(d):
-    """★rollout_id で重複を落とす。
+    """De-duplicate by rollout_id.
 
-    2台のマシンで分担して走らせ、あとで片方へ集約するので、同じ rollout_id が
-    複数ファイルに入りうる（実測: taketomi の minerva_eval 4,680 本は
-    Fujiwara の 7,200 本に完全に含まれていた）。素朴に足すと成功率が歪む。
-    resume でも同じ rollout_id が再度書かれることがある。**後勝ちで1本に潰す。**
+    Work was split across two machines and merged afterwards, so the same rollout_id can appear
+    in several files -- one policy's 4,680 rows on the second machine turned out to be entirely
+    contained in the 7,200 on the first. Summing naively would skew the success rate. Resume
+    can also rewrite an id. The last occurrence wins.
     """
     rows = {}
     for f in sorted(glob.glob(os.path.join(d, "*.jsonl"))):
@@ -78,13 +78,13 @@ def main():
                 e[a][lv] = dict(zip(("sr", "n"), rate(sub)))
                 e[a][lv]["by_suite"] = {s: dict(zip(("sr", "n"),
                     rate([r for r in sub if r["suite"] == s]))) for s in SUITES}
-        # 乗法性: 独立仮定からの予測 vs 観測
+        # multiplicativity: prediction under independence vs the observation
         c = e["clean"]["sr"]
         e["multiplicative"] = {}
         for lv in LEVELS:
             pred = c
             ok = True
-            for a in AXES[:-1]:                       # combination を除く6軸
+            for a in AXES[:-1]:                       # the six axes, excluding combination
                 r = e[a][lv]["sr"]
                 if not np.isfinite(r) or not np.isfinite(c) or c == 0: ok = False; break
                 pred *= r / c
@@ -96,14 +96,14 @@ def main():
     json.dump(S, open(os.path.join(OUT_DIR, "summary.json"), "w"),
               ensure_ascii=False, indent=1, default=float)
 
-    # ---- 人が読む表
+    # ---- human-readable table
     L = []
-    L.append("# 結果まとめ（自動生成）\n")
-    L.append(f"生成: {__import__('time').strftime('%Y-%m-%d %H:%M:%S')}\n")
+    L.append("# Result summary (generated)\n")
+    L.append(f"generated: {__import__('time').strftime('%Y-%m-%d %H:%M:%S')}\n")
     for m, e in sorted(S.items()):
         L.append(f"\n## {m}\n")
         L.append(f"clean: **{e['clean']['sr']*100:.2f}%** (n={e['clean']['n']})\n")
-        L.append(f"| 軸 | L1 | L2 | L3 | 傾き/level |")
+        L.append(f"| axis | L1 | L2 | L3 | slope/level |")
         L.append("|---|---:|---:|---:|---:|")
         for a in AXES:
             row = f"| {a} "
@@ -116,8 +116,8 @@ def main():
             row += f"| {sl:.1f}pp |" if np.isfinite(sl) else "| - |"
             L.append(row)
         mm = e["multiplicative"]
-        L.append(f"\n乗法性（独立仮定の予測 vs 観測）\n")
-        L.append("| level | 予測 | 観測 | 差 |")
+        L.append(f"\nMultiplicativity (prediction under independence vs observation)\n")
+        L.append("| level | predicted | observed | gap |")
         L.append("|---|---:|---:|---:|")
         for lv in LEVELS:
             d = mm[lv]
@@ -127,7 +127,7 @@ def main():
                 L.append(f"| {lv} | {d['pred']*100:.1f}% | {d['obs']*100:.1f}% | {d['diff']*100:+.1f} |")
     open(os.path.join(OUT_DIR, "summary.md"), "w").write("\n".join(L) + "\n")
     print("\n".join(L[:60]))
-    print(f"\nsaved {OUT_DIR}/summary.json, {OUT_DIR}/summary.md  （モデル {len(S)} 本）")
+    print(f"\nsaved {OUT_DIR}/summary.json, {OUT_DIR}/summary.md  ({len(S)} policies)")
 
 
 if __name__ == "__main__":

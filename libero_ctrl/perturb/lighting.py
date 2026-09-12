@@ -1,4 +1,5 @@
-"""軸2 Lighting。明るさ・色（暖寒/緑マゼンタ）・環境光・光源仰角。**影は出さない**。"""
+"""Axis 2, lighting: intensity, colour (warm/cool and green/magenta), ambient level and
+source elevation. Shadows are deliberately not cast."""
 import numpy as np
 from . import Perturbation, PerturbSpec
 

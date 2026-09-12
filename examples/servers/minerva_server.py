@@ -1,36 +1,34 @@
-"""MINERVA (arXiv:2609.03715) を別プロセスで常駐させ、我々の env から呼べるようにする。
+"""Serve the MINERVA policy (arXiv:2609.03715) from its own process.
 
-**なぜサーバにするか**: MINERVA は Python 3.13 / MuJoCo 3.3.2 / LeRobot を要求し、
-我々のスタック（Python 3.10 / MuJoCo 2.3.7 / robosuite 1.4.0）と同一プロセスで同居できない。
-env 側の再現性（校正・solvability を全てこのスタックで作った）を優先し、方策だけを外に出す。
-同じ仕組みで OpenVLA-OFT や pi0 の依存衝突も解ける。
+Why a server: this policy requires Python 3.13, MuJoCo 3.3.2 and LeRobot, which cannot coexist
+in one process with the env stack (Python 3.10, MuJoCo 2.3.7, robosuite 1.4.0). The env stack
+is where calibration and solvability were established, so the policy moves out instead. The
+same arrangement resolves the dependency conflicts of OpenVLA-OFT and pi0.
 
-**task-ID の扱い**: MINERVA は指示文を 40 エントリの辞書でタスク番号に変換するだけで、
-言語エンコーダを持たない。診断の目的は「タスクを番号で記憶するだけでは解けない」ことを
-示すことなので、既定では **そのタスクの正規の指示文を常に渡す**（= タスク番号を無料で与える）。
-こうすると言語軸でも実行でき、「番号を知っていれば言い換えは無関係」という
-構造が数字で見える。row の指示文をそのまま渡す literal モードも用意する。
+On the instruction: this policy has no language encoder. It resolves an instruction to an index
+in a 40-entry table and raises KeyError on anything else, so the language and combination axes
+are undefined for it and it is evaluated on five axes with the canonical instruction.
 
-  起動: MINERVA/.venv/bin/python examples/servers/minerva_server.py --sock /tmp/minerva.sock
+  start:  <policy venv>/bin/python examples/servers/minerva_server.py --sock /tmp/minerva.sock
 """
 import os, sys, argparse, socket, traceback
-# ★torch のスレッド数を 1 に固定する。**import torch より前**に環境変数を置く。
-# MINERVA は 0.55M しかないので CPU 並列の利得はなく、既定（全コア）だと
-# 1 サーバが 4.8 コアを占有して並列実行数が上げられない（2026-09-04 実測）。
+# Pin torch to one thread, and set the environment variables *before* importing torch.
+# A sub-million-parameter policy gains nothing from CPU parallelism, and the default (all
+# cores) has one server occupying 4.8 cores, which caps how many can run side by side.
 for _v in ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS",
            "NUMEXPR_NUM_THREADS", "VECLIB_MAXIMUM_THREADS"):
     os.environ.setdefault(_v, "1")
 import numpy as np, torch
 torch.set_num_threads(1)
 torch.set_num_interop_threads(1)
-# ★通信プロトコルは libero_ctrl/policy/wire.py が正準（コピーを増やさない）。
-#   サーバは方策側の venv で動くのでパッケージとしては import せず、ファイルだけを読む。
+# libero_ctrl/policy/wire.py is the single copy of the wire protocol. The server runs in the
+# policy's venv, so the module file is loaded directly rather than importing the package.
 sys.path.insert(0, os.path.join(os.environ.get("LIBERO_CTRL_ROOT",
     os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))),
     "libero_ctrl", "policy"))
 from wire import send, recv
 
-MINERVA = os.environ.get("MINERVA_HOME", "/home/hiroki/Code/MINERVA")
+MINERVA = os.environ.get("MINERVA_HOME", os.path.expanduser("~/MINERVA"))
 sys.path.insert(0, os.path.join(MINERVA, "src"))
 
 
@@ -49,8 +47,8 @@ def build(ckpt: str, device: str):
         policy_cfg=cfg, pretrained_path=ckpt,
         preprocessor_overrides={"device_processor": {"device": device},
                                 "rename_observations_processor": {"rename_map": {}}})
-    # 画像の 180 度回転と 8 次元 state の組み立ては LiberoProcessorStep が持っている。
-    # 自前で書き直さず、彼らの評価と同じものを使う。
+    # LiberoProcessorStep already performs the 180-degree image rotation and assembles the
+    # 8-dimensional state. Use theirs rather than reimplementing it.
     envpre, envpost = make_env_pre_post_processors(env_cfg=LiberoEnv(), policy_cfg=cfg)
     return policy, pre, post, envpre
 
@@ -66,19 +64,19 @@ def main():
 
     from lerobot.envs.utils import preprocess_observation
     policy, pre, post, envpre = build(a.ckpt, a.device)
-    # 公表プロトコル: 毎ステップ再計画 + temporal ensembling
+    # Published protocol: replan every step, with temporal ensembling.
     if a.temporal_ensemble_coeff is not None:
         policy.config.temporal_ensemble_coeff = a.temporal_ensemble_coeff
     policy.config.n_action_steps = a.n_action_steps
     if hasattr(policy, "reset"): policy.reset()
-    print(f"MINERVA 読み込み完了 params={sum(p.numel() for p in policy.parameters())/1e6:.2f}M "
+    print(f"MINERVA loaded params={sum(p.numel() for p in policy.parameters())/1e6:.2f}M "
           f"n_action_steps={policy.config.n_action_steps} "
           f"temporal_ensemble_coeff={getattr(policy.config,'temporal_ensemble_coeff',None)}", flush=True)
 
     if os.path.exists(a.sock): os.unlink(a.sock)
     srv = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     srv.bind(a.sock); srv.listen(1)
-    print(f"待機中: {a.sock}", flush=True)
+    print(f"listening on: {a.sock}", flush=True)
     while True:
         conn, _ = srv.accept()
         conn.setsockopt(socket.IPPROTO_TCP if False else socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
@@ -116,7 +114,7 @@ def main():
                     act = post(act)
                     send(conn, dict(ok=True), dict(action=act.to("cpu").numpy().astype(np.float32)[0]))
                 else:
-                    send(conn, dict(ok=False, err=f"未知のコマンド {cmd}"))
+                    send(conn, dict(ok=False, err=f"unknown command {cmd}"))
         except Exception:
             traceback.print_exc()
             try: send(conn, dict(ok=False, err=traceback.format_exc()[-2000:]))

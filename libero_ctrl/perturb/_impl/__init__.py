@@ -1,1 +1,1 @@
-"""摂動の実装本体。利用者が直接触る必要はない。"""
+"""The perturbation implementations. Not part of the public API."""

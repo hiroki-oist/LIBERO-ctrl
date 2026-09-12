@@ -1,4 +1,5 @@
-"""軸1 Camera。agentview を注視点まわりの球面座標で動かす。手先カメラは触らない。"""
+"""Axis 1, camera: move the agentview camera in spherical coordinates about its look-at
+point. The wrist camera is left alone."""
 import numpy as np
 from . import Perturbation, PerturbSpec
 
@@ -12,6 +13,8 @@ class CameraPerturb(Perturbation):
         self.d = np.array([float(spec.params[k]) for k in KEYS])
 
     def apply_model(self, task) -> None:
-        # 注視点は「カメラ光軸上で可動物体の重心に最も近い点」（Task が構築時に決めている）。
-        # z=0.90 平面との交点だと arena ごとにテーブル高さが違い、交点がカメラ後方に出る。
+        # The look-at point is the point on the optical axis closest to the centroid of the
+        # movable objects, fixed by Task at construction. Intersecting a fixed z = 0.90 plane
+        # instead fails, because table height differs per arena and the intersection can land
+        # behind the camera.
         task.set_camera(self.d)

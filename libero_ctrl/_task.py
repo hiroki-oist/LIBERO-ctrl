@@ -1,9 +1,8 @@
-"""LIBERO 環境のラッパ（Task）と決定論的な env シード。
+"""The LIBERO env wrapper (Task) and the deterministic env seed.
 
-★calibration/lib_ctrl.py をパッケージ内に取り込んだもの。元は sys.path 経由で
-  読んでいたが、壊れやすいので実行時コードは全てパッケージに入れる方針にした。
+Everything needed at run time lives inside the package, so that nothing depends on sys.path
+manipulation.
 """
-"""LIBERO-CTRL 摂動の共通実装（pilot 用）。"""
 import os, numpy as np, torch
 from libero.libero import benchmark, get_libero_path
 from libero.libero.envs import OffScreenRenderEnv
@@ -33,10 +32,10 @@ def kelvin_rgb(T):
     return np.clip(np.array([r,g,b]),0,255)/255.
 
 def light_color(warm, tint):
-    """照明の色。輝度 (Rec.709) を保存した RGB 倍率を返す。
+    """Light colour, as an RGB gain that preserves Rec.709 luminance.
 
-    warm : R x2^warm, B x2^-warm （正で暖色、負で寒色）
-    tint : G x2^tint, R,B x2^(-tint/2) （正で緑、負でマゼンタ）
+    warm : R x2^warm, B x2^-warm      (positive = warmer, negative = cooler)
+    tint : G x2^tint, R,B x2^(-tint/2) (positive = green, negative = magenta)
     """
     c = np.array([2.0 ** warm, 1.0, 2.0 ** -warm], float)
     c = c * np.array([2.0 ** (-tint / 2), 2.0 ** tint, 2.0 ** (-tint / 2)])
@@ -44,7 +43,8 @@ def light_color(warm, tint):
 
 
 def equiv_cct(warm, lo=1000., hi=40000.):
-    """warm 成分に最も近い黒体色温度 [K]。報告用（軸そのものは黒体ではない）。"""
+    """The blackbody colour temperature (K) closest to a given warm component. For reporting
+    only -- the axis itself is not parameterised along the blackbody locus."""
     t = np.exp(np.linspace(np.log(lo), np.log(hi), 400))
     tgt = light_color(warm, 0.0)
     best = min(t, key=lambda x: float(np.sum((kelvin_rgb(x) / (0.2126 * kelvin_rgb(x)[0]
@@ -52,20 +52,21 @@ def equiv_cct(warm, lo=1000., hi=40000.):
     return float(best)
 
 
-ENV_SEED = 20260904      # env 構築時の配置サンプラを固定するシード（manifest.protocol.env_seed と一致させる）
+ENV_SEED = 20260904      # pins the placement sampler; must match manifest.protocol.env_seed
 
 
 def seed_env(seed=ENV_SEED):
-    """env を **構築する直前** に呼ぶ。LIBERO の什器配置を再現可能にする。
+    """Call immediately *before* constructing an env, to make fixture placement reproducible.
 
-    ★LIBERO の 92次元 sim state には**静的 body（什器）の配置が入っていない。**
-    state が持つのは可動物体の qpos/qvel だけで、棚・コンロ等の什器は env 構築時に
-    robosuite の配置サンプラが乱数で置く。そのサンプラはシードされていないため、
-    **同じタスク・同じ init_id でも実行のたびに什器の位置と傾きが変わる**
-    （libero_spatial t7 で wooden_cabinet が 8.5mm + 回転、flat_stove が 7.6mm。
-      2026-09-04 実測、`calibration/fixture_jitter.json`）。
-    set_init_state では戻らない（state に無いため）。
-    これを固定しないとベンチマークが再現できない。
+    LIBERO's 92-dimensional sim state does not contain the placement of static bodies. It holds
+    qpos/qvel for the movable objects only; shelves, stoves and cabinets are positioned by
+    robosuite's placement sampler when the env is constructed, and that sampler is not seeded.
+    So the same task with the same init_id puts the fixtures somewhere slightly different on
+    every run (measured on libero_spatial task 7: the wooden cabinet moves 8.5 mm and rotates,
+    the flat stove moves 7.6 mm; see calibration/fixture_jitter.json). set_init_state does not
+    bring them back, because they are not in the state.
+
+    Nothing about this benchmark reproduces if this is not pinned.
     """
     import random
     random.seed(seed); np.random.seed(seed)
@@ -92,15 +93,16 @@ class Task:
         self.CS0=m.light_castshadow.copy()
         self._body_pos0=m.body_pos.copy()
         jn={m.joint_id2name(j) for j in range(m.njnt)}
-        # 全 free object（衝突判定用）と obj_of_interest（摂動対象）
+        # every free object (for collision checks) and obj_of_interest (what gets perturbed)
         self.free_objs=[(m.joint_id2name(j).rsplit("_joint0",1)[0], m.jnt_qposadr[j]+1)
                         for j in range(m.njnt) if m.jnt_type[j]==0]
         self.tgt_objs=[(nm, m.jnt_qposadr[m.joint_name2id(f"{nm}_joint0")]+1)
                        for nm in self.env.obj_of_interest if f"{nm}_joint0" in jn]
 
-        # 注視点: カメラ光軸上で「可動物体の重心」に最も近い点。
-        # z=0.90 平面との交点を使うと arena ごとにテーブル高さが違うため
-        # 交点がカメラ後方に出て球面座標が破綻する（libero_object で仰角が符号反転した）。
+        # Look-at point: the point on the optical axis closest to the centroid of the movable
+        # objects. Intersecting a fixed z = 0.90 plane instead breaks down, because table
+        # height differs per arena and the intersection can land behind the camera -- which
+        # flipped the sign of the elevation on libero_object.
         f0=-quat2mat(self.Q0)[:,2]
         self.env.set_init_state(self.S[0]); self.sim.forward()
         cs=[]
@@ -115,7 +117,7 @@ class Task:
             if bid is not None: cs.append(self.sim.data.xipos[bid].copy())
         ctr=np.mean(cs,axis=0) if cs else self.P0+f0
         d0=float(np.dot(ctr-self.P0,f0))
-        if not np.isfinite(d0) or d0<0.2: d0=1.1          # 退化時の保険
+        if not np.isfinite(d0) or d0<0.2: d0=1.1          # fallback for degenerate geometry
         self.L0=self.P0+d0*f0
         u0=self.P0-self.L0; self.D0=np.linalg.norm(u0); u0=u0/self.D0
         self.AZ0,self.EL0=np.arctan2(u0[1],u0[0]),np.arcsin(u0[2])
@@ -156,22 +158,25 @@ class Task:
         m.vis.headlight.ambient[:]=np.clip(self.AMB0*(2.**damb),0,1)
 
     def set_light5(self, d, shadow=False):
-        """軸2 lighting（5次元）。2026-09-04 改訂。
+        """The lighting axis, five dimensions.
 
         d = (d_intensity_ev, d_log2_warm, d_tint_g, d_log2_ambient, d_elevation_deg)
 
-        **影は出さない**（LIBERO 既定の castshadow=false のまま）。影を有効にすると
-        MuJoCo はスポットライトの円錐減衰（cutoff 45deg）を適用しなくなり、
-        円錐からはみ出す広いテーブルを持つシーン（libero_10 t2/t3/t8/t9）で
-        露出が 1.28 倍に跳ねて 50% が白飛びする。LIBERO が影を切っている理由でもある。
-        影が無いので**光源の方位角は画にほとんど影響せず**、軸に含めない
-        （5次元の球面で1次元を無駄にすると他のパラメータの実効量が下がる）。
+        Shadows are not cast: LIBERO's default castshadow=false is kept. Enabling shadows makes
+        MuJoCo stop applying the spotlight's cone falloff (cutoff 45 deg), and in scenes with a
+        wide table that overflows the cone (libero_10 tasks 2, 3, 8, 9) exposure jumps by 1.28x
+        and half the frame blows out. This is presumably why LIBERO disables them too.
 
-        色は **対数ゲインで対称に**持つ。黒体軌跡 6500K*2^d だと強くしたとき
-        黄側が純赤 (1,0,0) に飽和する一方で青側はほとんど動かず、非対称になる。
-          warm : R x2^d,  B x2^-d          （R/B 比 = 2^(2d)。L3 で 16 倍）
-          tint : G x2^d,  R,B x2^(-d/2)    （緑 / マゼンタ。L3 で G x2.14）
-        いずれも Rec.709 輝度を保存するよう正規化するので、**色だけが変わる**。
+        With no shadows the light's *azimuth* barely affects the image, so it is not part of the
+        axis: spending one of five spherical dimensions on a parameter with no effect would
+        dilute the others.
+
+        Colour is parameterised as a symmetric logarithmic gain. Following the blackbody locus
+        (6500K * 2^d) instead is asymmetric: pushed hard, the warm side saturates to pure red
+        (1,0,0) while the cool side barely moves.
+          warm : R x2^d,  B x2^-d          (R/B ratio = 2^(2d); 16x at L3)
+          tint : G x2^d,  R,B x2^(-d/2)    (green / magenta; G x2.14 at L3)
+        Both are normalised to preserve Rec.709 luminance, so only the colour changes.
         """
         ev, warm, tint, damb, el = d
         m = self.m
@@ -198,7 +203,8 @@ class Task:
         return st
 
     def restore(self):
-        """20 ステップ回した後にコントローラ内部状態を戻す（env.reset は sim を作り直すので使わない）"""
+        """Reset the controller's internal state after stepping. env.reset() is avoided here
+        because it rebuilds the sim."""
         try: self.env.env.robots[0].controller.reset_goal()
         except Exception: pass
 
@@ -208,7 +214,7 @@ class Task:
     def close(self): self.env.close()
 
 
-# ---------------- EEF 空間のロボット摂動（IK） ----------------
+# ---------------- robot perturbation in end-effector space (IK) ----------------
 import mujoco as _mj
 
 def _axisangle2mat(v):
@@ -231,8 +237,11 @@ def eef_pose(T, st):
     return T.sim.data.site_xpos[s].copy(), T.sim.data.site_xmat[s].copy().reshape(3,3)
 
 def perturb_robot_eef(T, st, dpos, drot, iters=200, lam=0.08):
-    """EEF を dpos[m] 平行移動 / drot[rad, axis-angle] 回転させる関節角を IK で求める。
-    戻り値: (新しい init state, 位置誤差[m], 姿勢誤差[deg], 関節リミットに当たった数)"""
+    """Solve for the joint angles that translate the end effector by dpos (m) and rotate it by
+    drot (rad, axis-angle).
+
+    Returns (new init state, position residual [m], orientation residual [deg], number of
+    joints that hit a limit)."""
     m,sim=T.m,T.sim; s=_grip_site(T)
     p0,R0=eef_pose(T,st)
     pt=p0+np.asarray(dpos); Rt=_axisangle2mat(np.asarray(drot))@R0
@@ -254,7 +263,7 @@ def perturb_robot_eef(T, st, dpos, drot, iters=200, lam=0.08):
     return stn, ep, er, nclip
 
 def robot_collides(T, st, tol=0.002):
-    """ロボット本体がテーブル・什器・物体に食い込んでいないか。"""
+    """Whether the arm is interpenetrating the table, a fixture or an object."""
     m,sim=T.m,T.sim
     T.env.set_init_state(st); sim.forward()
     worst=0.0; pair=None
@@ -268,11 +277,11 @@ def robot_collides(T, st, tol=0.002):
     return (worst>tol), worst, pair
 
 
-# ---------------- 支持体を検出して「台ごと動かす」 ----------------
+# ---------------- detect what an object rests on, and move the support with it ----------------
 from collections import defaultdict
 
 def _root_body(T, bid):
-    """world の直下まで遡った祖先 body id。"""
+    """The ancestor body id, walked up to the child of world."""
     m=T.m
     while m.body_parentid[bid] != 0: bid = m.body_parentid[bid]
     return bid
@@ -281,13 +290,15 @@ def _is_robot(name):
     return name is not None and (name.startswith("robot0") or name.startswith("gripper0"))
 
 def detect_supports(T, st, warm=20):
-    """clean を静定させ「どの物体がどの body に載っているか」を返す。
-    戻り値: supports {free_obj -> 支持 root body 名}, resting_on {root body 名 -> [free_obj]}"""
+    """Settle the nominal scene and report what rests on what.
+
+    Returns supports {free object -> supporting root body name} and
+    resting_on {root body name -> [free objects]}."""
     m,sim=T.m,T.sim
     T.env.set_init_state(st); sim.forward()
     dummy=np.zeros(T.env.env.action_dim); dummy[-1]=-1.0
     for _ in range(warm): T.env.step(dummy)
-    # body id -> free object 名
+    # body id -> free object name
     obj_of_body={}
     for nm,_ in T.free_objs:
         try: obj_of_body[m.body_name2id(f"{nm}_main")]=nm
@@ -302,20 +313,20 @@ def detect_supports(T, st, warm=20):
             if o is None: continue
             if _is_robot(m.body_id2name(bb)): continue
             zc=con.pos[2]; zo=sim.data.xipos[ba][2]
-            if zc < zo - 0.005:                       # 接触点が物体重心より下 = 支持
+            if zc < zo - 0.005:                       # contact below the centroid = support
                 depth=zo-zc
                 if o not in best or depth>best[o][0]:
                     best[o]=(depth,_root_body(T,bb))
     for o,(_,rb) in best.items():
         rn=m.body_id2name(rb)
-        sup=obj_of_body.get(rb, rn)                   # free object ならその名前
+        sup=obj_of_body.get(rb, rn)                   # a free object contributes its own name
         supports[o]=sup; resting[sup].append(o)
     T.restore()
     return supports, dict(resting)
 
 def support_move_set(T, supports, resting, targets):
-    """targets とその支持体、さらにその上に載っている物体すべてを集める。
-    テーブルは動かさない。戻り値: (free object 名の集合, fixture root body 名の集合)"""
+    """Collect the targets, their supports, and everything else resting on those supports.
+    The table is never moved. Returns (set of free object names, set of fixture root body names)."""
     free_names={nm for nm,_ in T.free_objs}
     is_table=lambda n: n is None or "table" in n
     mf=set(targets); mx=set()
@@ -334,8 +345,8 @@ def support_move_set(T, supports, resting, targets):
     return mf, mx
 
 def perturb_objects_support(T, st, dxy_map, fixture_shift):
-    """free object は qpos、fixture は model の body_pos をずらす。
-    fixture を動かすため model を触るので、呼び出し側で reset_fixtures() を必ず呼ぶこと。"""
+    """Displace free objects through qpos and fixtures through the model's body_pos. Because
+    this writes to the model, the caller must call reset_fixtures() afterwards."""
     st=st.copy(); m=T.m
     cols={nm:c for nm,c in T.free_objs}
     for nm,d in dxy_map.items():

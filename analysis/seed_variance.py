@@ -1,9 +1,10 @@
-"""MINERVA 公開3シード（abl_l1 s1000/2000/3000）で逸脱指標の学習シード分散を測る。
-   各シード 10,400 本（clean 2,000 + eval 8,400）。本文 §Results と同一の推定式を使う。"""
+"""Training-seed variance of the deviation measures, over three released seeds
+(s1000/s2000/s3000) of one policy, 10,400 rollouts each (2,000 nominal + 8,400 perturbed).
+The estimators are the same ones used in the paper."""
 
 import os as _os
-# ★結果は results/paper/<run名>/rollouts.jsonl に統合済み（fuji と taketomi の両方を、
-#   taketomi 優先でマージ）。旧リポジトリの /tmp/tkpull による上書きはもう不要。
+# Results live at results/paper/<run>/rollouts.jsonl, already merged across the machines
+# they were collected on (see docs/RESULTS_INDEX.md for the merge rule).
 ROOT = _os.environ.get("LIBERO_CTRL_ROOT",
        _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))
 RESULTS = _os.path.join(ROOT, "results", "paper")
@@ -61,19 +62,19 @@ for seed in (1000,2000,3000):
         rec["conj"][L]=dict(n=len(ks),AND=100*len(a1)/len(ks),
             obs=100*sum(tbl[k]["combination"] for k in ks)/len(ks),b=b,c=c,p=binom2(b,c))
     OUT[seed]=rec
-    print(f"seed {seed}: {rec['n']}本 clean {rec['clean']:.2f}% eval {rec['eval']:.1f}%")
+    print(f"seed {seed}: {rec['n']} rollouts, nominal {rec['clean']:.2f}%, perturbed {rec['eval']:.1f}%")
     for L in ("L1","L2","L3"):
         d=rec["prod"][L]; j=rec["conj"][L]
-        print(f"   {L} 積: pred {d['pred']:5.1f} obs {d['obs']:5.1f} dev {d['dev']:+6.1f} [{d['lo']:+.1f},{d['hi']:+.1f}] p={d['p']:.3f}"
+        print(f"   {L} product: pred {d['pred']:5.1f} obs {d['obs']:5.1f} dev {d['dev']:+6.1f} [{d['lo']:+.1f},{d['hi']:+.1f}] p={d['p']:.3f}"
               f" | AND {j['AND']:5.1f} b={j['b']} c={j['c']} pM={j['p']:.3f}")
-print("\n=== シード間のばらつき ===")
-print(f"{'量':<26}"+"".join(f"{f's{s}':>9}" for s in (1000,2000,3000))+f"{'mean':>9}{'SD':>7}{'range':>8}")
+print("\n=== spread across seeds ===")
+print(f"{'quantity':<26}"+"".join(f"{f's{s}':>9}" for s in (1000,2000,3000))+f"{'mean':>9}{'SD':>7}{'range':>8}")
 def row(lab,f):
     v=[f(OUT[s]) for s in (1000,2000,3000)]
     print(f"{lab:<26}"+"".join(f"{x:>9.2f}" for x in v)+f"{np.mean(v):>9.2f}{np.std(v,ddof=1):>7.2f}{max(v)-min(v):>8.2f}")
 row("clean SR (%)",lambda r:r["clean"])
 for L in ("L1","L2","L3"):
-    row(f"逸脱 {L} (pp)",lambda r,L=L:r["prod"][L]["dev"])
+    row(f"deviation {L} (pp)",lambda r,L=L:r["prod"][L]["dev"])
 for L in ("L1","L2","L3"):
-    row(f"観測-AND {L} (pp)",lambda r,L=L:r["conj"][L]["obs"]-r["conj"][L]["AND"])
+    row(f"observed-AND {L} (pp)",lambda r,L=L:r["conj"][L]["obs"]-r["conj"][L]["AND"])
 json.dump(OUT,open(f"{OUT_DIR}/seed_variance.json","w"),indent=1,default=float)

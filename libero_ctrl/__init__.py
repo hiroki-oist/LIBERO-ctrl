@@ -5,7 +5,8 @@ Three ways in, depending on how much evaluation code you already have.
   Level 0 -- swap the benchmark object (2 lines changed):
       from libero_ctrl import get_benchmark_dict
       bm = get_benchmark_dict(split="eval")["libero_ctrl_spatial"]()
-      # your existing loop over bm.n_tasks / bm.get_task_env(i) keeps working
+      env = bm.make_env(i, camera_heights=256, camera_widths=256)
+      # your existing loop over bm.get_task(i) / env.step(...) keeps working
 
   Level 1 -- keep your own loop, insert five hooks:
       from libero_ctrl import PerturbSpec, build, iter_rows

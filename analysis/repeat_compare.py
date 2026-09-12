@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""同一条件の反復と原本／反復同士を rollout_id で突き合わせ、方策の確率性を測る。"""
+"""Match repeats of identical conditions by rollout id, to measure how stochastic a policy is."""
 
 import os as _os
-# ★結果は results/paper/<run名>/rollouts.jsonl に統合済み（fuji と taketomi の両方を、
-#   taketomi 優先でマージ）。旧リポジトリの /tmp/tkpull による上書きはもう不要。
+# Results live at results/paper/<run>/rollouts.jsonl, already merged across the machines
+# they were collected on (see docs/RESULTS_INDEX.md for the merge rule).
 ROOT = _os.environ.get("LIBERO_CTRL_ROOT",
        _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))
 RESULTS = _os.path.join(ROOT, "results", "paper")
@@ -42,7 +42,7 @@ def pair(a,bb):
     return k,b,c
 def show(tag,rows):
     print(f"\n### {tag}")
-    print(f"{'policy':13s} {'n':>3s} {'不一致':>7s} {'95%CI':>14s} {'b/c':>7s} {'S1':>6s} {'S2':>6s} {'I伝播1SD':>9s}")
+    print(f"{'policy':13s} {'n':>3s} {'mismatch':>9s} {'95%CI':>14s} {'b/c':>7s} {'S1':>6s} {'S2':>6s} {'I 1SD':>7s}")
     tb=tc=0
     for name,k,b,c,a,bb in rows:
         n=len(k); d=b+c; lo,hi=wil(d,n); tb+=b; tc+=c
@@ -50,15 +50,15 @@ def show(tag,rows):
         print(f"{name:13s} {n:3d} {100*d/n:6.1f}% [{lo:4.1f},{hi:5.1f}] {b:3d}/{c:<3d} {s1:5.1f}% {s2:5.1f}% {100*math.sqrt(2*d/n*400)/400:8.2f}pt")
     n=tb+tc
     pv=min(1.0, 2*sum(comb(n,i) for i in range(0,min(tb,tc)+1))/2**n) if n else 1.0
-    print(f"{'合計':13s} {'':3s} {'':7s} {'':14s} {tb:3d}/{tc:<3d}   対称性の二項検定 p={pv:.4f}")
-# 原本 vs rep1
+    print(f"{'total':13s} {'':3s} {'':9s} {'':14s} {tb:3d}/{tc:<3d}   binomial test of symmetry p={pv:.4f}")
+# original vs rep1
 r1=[]
 for name,src,pfx in M:
     a=load(src); bb=load([f"{RESULTS}/{pfx}_rep1/*.jsonl"])
     if not bb: continue
     k,b,c=pair(a,bb)
     if k: r1.append((name,k,b,c,a,bb))
-show("原本 vs rep1（機械・時期が違う。系統差を含む上界）",r1)
+show("original vs rep1 (different machine and time: an upper bound that includes systematic differences)",r1)
 # rep1 vs rep2
 r2=[]
 for name,src,pfx in M:
@@ -66,4 +66,4 @@ for name,src,pfx in M:
     if not a or not bb: continue
     k,b,c=pair(a,bb)
     if k: r2.append((name,k,b,c,a,bb))
-show("rep1 vs rep2（同一機・同一時期。純粋なサンプリング雑音）",r2)
+show("rep1 vs rep2 (same machine, same session: pure sampling noise)",r2)

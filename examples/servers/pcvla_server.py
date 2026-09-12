@@ -1,41 +1,40 @@
-"""PC-VLA（予測符号化方策、675,732 パラメータ）を別プロセスで常駐させる。
+"""Serve PredVLA, a 675,732-parameter predictive-coding policy, from its own process.
 
-**参照実装**: `PredictiveCoding-VLA/pcrnn2/scripts/eval_single.py` のモデル評価経路。
-自前で書き直すと必ずずれるので、`Frontend` / `ERBatch` / `PCRNN2` は彼らの実装をそのまま呼ぶ。
+Reference implementation: the model evaluation path of the policy's own eval_single.py.
+Rewriting it is reliably wrong in some detail, so `Frontend`, `ERBatch` and `PCRNN2` are called
+as its authors wrote them.
 
-**確定プロトコル**（`release_arxiv/NAMING.md` 冒頭、2026-08-19 14:11）:
-    er_opt=adam / n_itr=10 / er_lr=0.05 / er_w=1.0 / window=40
-`eval.json` に記録されていた er_w=0.9 は集約スクリプトのハードコード値で、実設定ではない
-（2026-09-07 に 286 件を修正済み。`notes/FIXED_PROTOCOL_ER_W_2026-09-07.md`）。
+Protocol: er_opt=adam / n_itr=10 / er_lr=0.05 / er_w=1.0 / window=40.
 
-**この方策は推論時に潜在変数を反復最適化する。**`ERBatch` が窓 40 step の内部状態を持つので、
-`act` 呼び出し間で状態を持ち越し、`reset` で `reset_slot(0)` する。B=1 固定
-（1 プロセス = 1 ロールアウト。PLAN.md §19.5）。
+This policy optimises latent variables iteratively at inference time. `ERBatch` carries an
+internal state over a 40-step window, so the state persists between `act` calls and `reset`
+calls `reset_slot(0)`. B is fixed at 1 (one process, one rollout).
 
-**★画像は 128x128 に落とす。**`FrozenResNet18._prep` はリサイズしないので、256 のまま渡すと
-特徴マップが 8x8 になり 2x2 プーリングの結果が学習時（128 入力 -> 4x4）とずれる。
-一方 runner のレンダリングは **256 のままにする**: sensor 軸のぼかし半径などは画素単位で
-定義されているため、128 でレンダリングすると他 6 モデルと摂動の強度が変わって比較できなくなる。
-摂動は全モデル共通の 256 で掛け、そこから 128 に落とすのを方策側の前処理とする
-（OpenVLA-OFT が 224、UniVLA が 224 にするのと同じ扱い）。
+Images are downsampled to 128x128 here. `FrozenResNet18._prep` does not resize, so passing 256
+gives an 8x8 feature map and the 2x2 pooling no longer matches training (128 input -> 4x4).
+The runner still renders at 256: the sensor axis defines blur radius and the rest in pixels, so
+rendering at 128 would change the perturbation strength relative to the other six policies and
+break comparability. The perturbation is applied at the common 256 and the downsample to 128 is
+part of this policy's preprocessing -- exactly as OpenVLA-OFT and UniVLA resize to 224.
 
-**★向きは変換しない。**参照実装は `OffScreenRenderEnv` の生の観測をそのまま `Frontend` に渡す。
-MINERVA と OpenVLA-OFT が要求する 180 度回転は PC-VLA には不要（PLAN.md §19.3 の表を参照）。
+The image orientation is not converted. The reference implementation passes OffScreenRenderEnv's
+raw observation straight to `Frontend`; the 180-degree rotation some other checkpoints require
+is wrong for this one.
 
-**★言語は指示文からエンコードする。**参照実装は学習キャッシュの h5 に入った固定ベクトル
-（タスク番号に紐づく）を使うので、指示文を差し替えても方策に届かない。language 軸を測るには
-学習時と同じ文エンコーダで再エンコードする必要があるので、`Frontend.lang(text)` を使う。
+Language is encoded from the instruction text. The reference implementation reads a fixed
+vector from its training cache, keyed by task number, so a substituted instruction would never
+reach the policy. Measuring the language axis requires re-encoding with the same sentence
+encoder used during training, which is what `Frontend.lang(text)` does.
 
-**★torch.compile を必ず有効にする（2026-09-07 21:55）。**参照実装 `eval_single.py` の
-`--compile` は `ERBatch._roll` を `torch.compile(..., dynamic=False)` で包む。ER は 1 制御 step で
-「n_itr 10 反復 × 窓 40 step」= 400 回の RNN 前進・逆伝播を Python ループで回すので、
-compile の有無で桁が変わる。**公表されている 21.6 Hz は compile 有効の値**であり、
-これを落としたまま走らせて 402 ms/step しか出ず、41,600 本の見積りを 14〜17 時間と
-誤って報告した。同一負荷下の実測は compile 無し 402.5 ms / 有り 114.7 ms（cpu 1スレッド）。
-`TORCHINDUCTOR_CACHE_DIR` を共有すると 2 個目以降のサーバはコンパイル結果を再利用する。
+torch.compile must be enabled. The reference `eval_single.py --compile` wraps `ERBatch._roll`
+in `torch.compile(..., dynamic=False)`. One control step runs 10 iterations over a 40-step
+window -- 400 RNN forward and backward passes in a Python loop -- so compilation changes the
+throughput by an order of magnitude: measured 402.5 ms/step without it against 114.7 ms with
+it, on one CPU thread. The policy's published 21.6 Hz is the compiled figure. Sharing
+`TORCHINDUCTOR_CACHE_DIR` lets the second and later servers reuse the compiled artefacts.
 
-  起動: PredictiveCoding-VLA/.venv/bin/python examples/servers/pcvla_server.py \
-          --sock /tmp/pcv_0.sock --ckpt <.../PC-VLA_libero_spatial_s13/step_30000.pt>
+  start:  <policy venv>/bin/python examples/servers/pcvla_server.py \
+            --sock /tmp/pcv_0.sock --ckpt <.../step_30000.pt>
 """
 import argparse
 import os
@@ -46,7 +45,7 @@ import traceback
 for _v in ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS"):
     os.environ.setdefault(_v, "1")
 
-PCVLA_HOME = os.environ.get("PCVLA_HOME", "/home/hiroki/Code/PredictiveCoding-VLA")
+PCVLA_HOME = os.environ.get("PCVLA_HOME", os.path.expanduser("~/PredictiveCoding-VLA"))
 sys.path.insert(0, os.path.join(PCVLA_HOME, "pcrnn2"))
 sys.path.insert(0, PCVLA_HOME)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -56,8 +55,8 @@ import torch
 import torch.nn.functional as F
 
 torch.set_num_threads(1)
-# ★通信プロトコルは libero_ctrl/policy/wire.py が正準（コピーを増やさない）。
-#   サーバは方策側の venv で動くのでパッケージとしては import せず、ファイルだけを読む。
+# libero_ctrl/policy/wire.py is the single copy of the wire protocol. The server runs in the
+# policy's venv, so the module file is loaded directly rather than importing the package.
 sys.path.insert(0, os.path.join(os.environ.get("LIBERO_CTRL_ROOT",
     os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))),
     "libero_ctrl", "policy"))
@@ -65,7 +64,7 @@ from wire import send, recv
 
 
 def to128(img_u8):
-    """(H, W, 3) uint8 -> (128, 128, 3) uint8。学習時のレンダリング解像度に合わせる。"""
+    """(H, W, 3) uint8 -> (128, 128, 3) uint8, matching the training render resolution."""
     if img_u8.shape[0] == 128 and img_u8.shape[1] == 128:
         return np.ascontiguousarray(img_u8)
     x = torch.from_numpy(np.ascontiguousarray(img_u8)).permute(2, 0, 1)[None].float()
@@ -79,7 +78,7 @@ def main():
     ap.add_argument("--sock", default="/tmp/pcv.sock")
     ap.add_argument("--ckpt", required=True)
     ap.add_argument("--device", default="cuda")
-    # ★確定プロトコル。既定値を変えるときは NAMING.md と突き合わせること
+    # The fixed protocol; check against the policy's own naming notes before changing a default.
     ap.add_argument("--window", type=int, default=40)
     ap.add_argument("--n-itr", type=int, default=10)
     ap.add_argument("--er-lr", type=float, default=0.05)
@@ -87,7 +86,7 @@ def main():
     ap.add_argument("--er-opt", default="adam", choices=["adam", "sgd"])
     ap.add_argument("--er-lambda-v", type=float, default=1.0)
     ap.add_argument("--er-lambda-q", type=float, default=1.0)
-    # ★既定 ON。切るのは compile が壊れたときの退避用
+    # On by default; disable only as a fallback when compilation breaks.
     ap.add_argument("--no-compile", action="store_true")
     a = ap.parse_args()
 
@@ -104,13 +103,13 @@ def main():
         p.requires_grad_(False)
     stride = int(cfg["data"]["vision_stride"])
 
-    # cache_root は cfg に "../data/cache_ps_sp" のような相対パスで入っている。
-    # Frontend はリポジトリ直下からの相対として解決するが、絶対化して曖昧さを消す。
+    # cfg stores cache_root as a relative path such as "../data/cache_ps_sp". Frontend
+    # resolves it relative to the repository root; make it absolute to remove the ambiguity.
     cr = cfg["paths"]["cache_root"]
     cache_root = cr if os.path.isabs(cr) else os.path.normpath(
         os.path.join(PCVLA_HOME, "pcrnn2", cr))
     if not os.path.isdir(cache_root):
-        raise SystemExit(f"★PCA キャッシュが無い: {cache_root}（cfg の cache_root = {cr}）")
+        raise SystemExit(f"PCA cache not found: {cache_root} (cfg cache_root = {cr})")
     fe = Frontend(cache_root, device=a.device)
 
     l0 = fe.lang("pick up the object and place it").to(a.device)
@@ -121,15 +120,16 @@ def main():
 
     if not a.no_compile:
         import types
-        # ★参照実装 eval_single.py と同じ包み方。dynamic=False で窓長を固定形状にする
+        # Wrapped exactly as the reference eval_single.py does; dynamic=False fixes the
+        # window length to a static shape.
         er._roll = types.MethodType(torch.compile(ERBatch._roll, dynamic=False), er)
 
     n_par = sum(p.numel() for p in model.parameters())
-    print(f"読み込み完了 ckpt={a.ckpt}\n  params={n_par/1e6:.3f}M  v_dim={model.v_dim} "
+    print(f"loaded ckpt={a.ckpt}\n  params={n_par/1e6:.3f}M  v_dim={model.v_dim} "
           f"q_dim={model.q_dim} a_dim={model.a_dim}  vision_stride={stride}\n"
           f"  cache={os.path.basename(cache_root)}  "
           f"ER: {a.er_opt} n_itr={a.n_itr} er_lr={a.er_lr} er_w={a.er_w} window={a.window}"
-          f"  compile={'切' if a.no_compile else '入'}",
+          f"  compile={'off' if a.no_compile else 'on'}",
           flush=True)
 
     try:
@@ -139,7 +139,7 @@ def main():
     srv = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     srv.bind(a.sock)
     srv.listen(8)
-    print(f"待機中: {a.sock}", flush=True)
+    print(f"listening on: {a.sock}", flush=True)
 
     state = {"t": 0}
     while True:
@@ -153,15 +153,15 @@ def main():
                 if cmd == "ping":
                     send(conn, dict(ok=True, params=int(n_par)))
                 elif cmd == "reset":
-                    # ★指示文をその都度エンコードする（language 軸の摂動を方策に届かせる）
+                    # Encode the instruction every time, so the language axis reaches the policy.
                     l = fe.lang(h["task"]).to(a.device)
                     with torch.no_grad():
                         er.l[0] = l
-                        # ★★実際に方策が読むのは lang_t（= model.T.W_l(l) の射影）で、
-                        #   ERBatch.__init__ が構築時に一度だけ作る（er_batch.py:180-181）。
-                        #   er.l を書き換えても lang_t は古いままなので、ここで作り直す。
-                        #   これを落としていたため全ロールアウトがダミー指示文で走り、
-                        #   clean 成功率が 0% になった（2026-09-08、8,000本を無駄にした）。
+                        # What the policy actually reads is lang_t, the projection
+                        # model.T.W_l(l), which ERBatch.__init__ builds once at construction
+                        # (er_batch.py:180-181). Overwriting er.l leaves lang_t stale, so it
+                        # is rebuilt here. Missing this once made every rollout run on a dummy
+                        # instruction and the nominal success rate came out at 0%.
                         er.lang_t[0] = model.T.W_l(l[None])[0]
                     er.reset_slot(0)
                     state["t"] = 0
@@ -184,12 +184,12 @@ def main():
                                      else act[0], dtype=np.float32)
                     send(conn, dict(ok=True), dict(action=act))
                 else:
-                    send(conn, dict(ok=False, err=f"未知のコマンド {cmd}"))
+                    send(conn, dict(ok=False, err=f"unknown command {cmd}"))
         except Exception as e:
             traceback.print_exc()
-            # ★CUDA コンテキストが壊れたら sticky なので自分で死ぬ（PLAN.md §19.6）
+            # CUDA errors are sticky, so a broken context means this process must die.
             if "CUDA error" in str(e) or "AcceleratorError" in type(e).__name__:
-                print("★CUDA コンテキストが壊れたのでサーバを終了する", flush=True)
+                print("CUDA context is broken; shutting the server down", flush=True)
                 try:
                     os.unlink(a.sock)
                 except Exception:

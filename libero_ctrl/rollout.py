@@ -1,4 +1,4 @@
-"""1 rollout の実行。manifest の行がそのまま入力になる。"""
+"""Running one rollout. A manifest row is the input, unchanged."""
 import numpy as np
 from .env import warmup, check_success, soft_reset, sim_reset, env_reset
 from .perturb import PerturbSpec, build
@@ -6,22 +6,24 @@ from .perturb import PerturbSpec, build
 
 def run_rollout(task, row: dict, policy, *, res: int, record_video: bool = False,
                 reset_mode: str = "env"):
-    """manifest の1行を実行して結果を返す。実行時に乱数を引かない（seed は行から導出）。
+    """Run one manifest row and return the result. Nothing is sampled here: the seed comes
+    from the row.
 
-    軸ごとの適用点:
-      camera/lighting -> apply_model（reset 後に sim.model.* を書き換え）
-      robot           -> transform_init_state（IK で EEF をずらす）
-      sensor          -> transform_obs（描画後に劣化）
-      actuation       -> transform_action（実行前に action を変換）
-      language        -> row["language"] をそのまま policy に渡す（env から導出しない）
+    Where each axis applies:
+      camera/lighting -> apply_model            (overwrite sim.model.* after reset)
+      robot           -> transform_init_state   (IK displaces the end effector)
+      sensor          -> transform_obs          (degrade after rendering)
+      actuation       -> transform_action       (transform before execution)
+      language        -> row["language"] is passed to the policy as-is, never derived from env
     """
     from .manifest import rollout_seed
     spec = PerturbSpec.from_row(row)
     p = build(spec, suite=row["suite"], shape=(res, res))
-    seed = rollout_seed(row["rollout_id"])             # ★安定ハッシュ。hash() は使わない
+    seed = rollout_seed(row["rollout_id"])             # stable hash; hash() is not usable
     p.reset(seed)
 
-    # ★rollout 間の持ち越しを消す。set_init_state は qpos/qvel しか戻さない。
+    # Clear everything carried over from the previous rollout. set_init_state restores only
+    # qpos/qvel, not the controller state.
     if reset_mode == "env":   env_reset(task)
     elif reset_mode == "sim": sim_reset(task)
     else:                     soft_reset(task)
@@ -37,16 +39,17 @@ def run_rollout(task, row: dict, policy, *, res: int, record_video: bool = False
     ok, steps = False, 0
     for t in range(row["max_steps"]):
         obs = task.env.env._get_observations()
-        # ★画像は robosuite が返す**生の向き**（OpenGL 下から上）のまま渡す。
-        #   LIBERO のデモ hdf5 もこの向きで保存されている（macros_image_convention: opengl。
-        #   実測: デモ画像と生描画の平均絶対差 7.4 に対し、上下反転すると 55.6）。
-        #   向きの規約はモデルごとに違う（OpenVLA-OFT は 180 度回転を要求する）ので、
-        #   runner では決め打ちせず**各 policy アダプタが自分で変換する**。
+        # Images are passed on in the raw robosuite orientation (OpenGL, bottom-up). LIBERO's
+        # own demonstration HDF5 files are stored in that orientation too
+        # (macros_image_convention: opengl); measured mean absolute difference against the
+        # demos is 7.4 as-is, against 55.6 if flipped vertically. Released checkpoints disagree
+        # about the convention (OpenVLA-OFT wants a 180-degree rotation), so the runner does
+        # not guess: each policy adapter converts for itself.
         img = obs["agentview_image"]
         wrist = obs["robot0_eye_in_hand_image"]
         img = p.transform_obs(img)
         wrist = p.transform_obs(wrist)
-        if record_video: frames.append(img[::-1])   # 保存時だけ人が見る向きに
+        if record_video: frames.append(img[::-1])   # flip only for human-viewable video
         a = policy.act(img, wrist, obs)
         a = p.transform_action(a)
         task.env.env.done = False

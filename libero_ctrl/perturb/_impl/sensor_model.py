@@ -1,19 +1,20 @@
-"""軸5 Sensor Corruption。observation の劣化を runner 側で適用する（env に触らない）。
+"""Axis 5, sensor corruption: degradation applied to the observation, never to the env.
 
-パラメータ空間（4次元）:
-  0 noise_sigma   加算 Gaussian ノイズ σ（画素値 [0,1]）        毎ステップ変化
-  1 blur_sigma    Gaussian ぼかし σ（px, 基準解像度 128）        静的
-  2 jpeg_log2     JPEG quality = 100 * 2^(-d)                    静的
-  3 motion_len    motion blur カーネル長（px, 基準 128）          静的（向きは rollout 固定）
+Four parameters:
+  0 noise_sigma   additive Gaussian noise sigma, in [0,1] pixel units   redrawn each step
+  1 blur_sigma    Gaussian blur sigma, px at a reference resolution 128 static
+  2 jpeg_log2     JPEG quality = 100 * 2^(-d)                           static
+  3 motion_len    motion-blur kernel length, px at reference 128        static (as is its angle)
 
-遮蔽（黒パッチ）は 2026-09-03 に軸から外した。情報を削る摂動なので対象物を覆えば
-タスクが消滅し、設計原則 Solvable に反する（camera 軸で近づく方向をサンプルしないのと同じ）。
-残る4つはすべて「センサの劣化過程」（ショットノイズ・デフォーカス・圧縮・動きぶれ）で
-質が揃っている。
+Occlusion (a black patch) was dropped from this axis during design. It removes information
+rather than degrading it, so covering the target object destroys the task outright, which
+violates the solvability requirement -- the same reason the camera axis does not sample
+directions that move the camera into the scene. The four that remain are homogeneous: every one
+of them is a sensor degradation process (shot noise, defocus, compression, motion blur).
 
-px 単位（1, 3）は解像度に比例させる。noise と jpeg は解像度非依存。
-静的な要素（ぼかし・JPEG・motion blur の向き・遮蔽の位置）は rollout ごとに固定し、
-ノイズだけ毎ステップ引く。レンズの汚れや光学ぼけは時間変化しないという物理に合わせる。
+The two parameters measured in pixels scale with resolution; noise and JPEG quality do not.
+The static components are fixed once per rollout and only the noise is redrawn each step, which
+matches the physics: a smudged lens or an optical defocus does not change between frames.
 """
 import io, numpy as np
 from PIL import Image
@@ -21,7 +22,7 @@ from scipy.ndimage import gaussian_filter, convolve
 
 REF_RES = 128
 KEYS = ["noise_sigma", "blur_sigma", "jpeg_log2", "motion_len"]
-# 1 unit（pilot 校正済み: r=8 が「強いが解ける」、r=16 で破綻するよう調整）
+# One unit, calibrated on a pilot so that r = 8 is "severe but solvable" and r = 16 breaks down.
 UNIT = np.array([0.010, 0.25, 0.415, 0.75])
 MULT = {"L1": 2.0, "L2": 4.0, "L3": 8.0}
 JPEG_Q0 = 100.0
@@ -44,10 +45,10 @@ def _motion_kernel(length, angle_rad):
 
 
 class SensorCorruption:
-    """1 rollout ぶんの劣化器。静的要素を seed から一度だけ決める。"""
+    """The corruption for one rollout. The static components are drawn once from the seed."""
 
     def __init__(self, p, seed, shape):
-        """p: params() の dict。shape: (H, W)。"""
+        """p: the dict returned by params(). shape: (H, W)."""
         self.p = p; H, W = shape[:2]; self.H, self.W = H, W
         self.sc = min(H, W) / REF_RES
         rs = np.random.default_rng(seed)
@@ -58,7 +59,8 @@ class SensorCorruption:
         d = abs(p["jpeg_log2"])
         self.q = int(np.clip(round(JPEG_Q0 * 2.0 ** (-d)), 1, 100)) if d > 1e-3 else None
     def __call__(self, img_u8):
-        """適用順: motion blur -> gauss blur -> JPEG -> ノイズ（光学 -> 符号化 -> 読み出し）。"""
+        """Applied in physical order: motion blur -> Gaussian blur -> JPEG -> noise, i.e.
+        optics, then encoding, then readout."""
         x = img_u8.astype(np.float64) / 255.0
         if self.mk is not None:
             for c in range(3): x[..., c] = convolve(x[..., c], self.mk, mode="nearest")

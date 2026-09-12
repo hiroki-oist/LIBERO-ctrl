@@ -1,13 +1,13 @@
 # LIBERO-CTRL
-# ★PY は LIBERO が動く python を指す。既定はこのリポジトリを開発した環境。
+# PY must point at a python where LIBERO works.
 PY ?= python3
 
 .PHONY: help smoke paper verify clean-out
 
 help:
-	@echo "make smoke   — 3 つの導入レベルが動くことを確認（rollout を数本だけ回す）"
-	@echo "make paper   — 論文の表と図を results/paper/ から再生成（analysis/out/ に出る）"
-	@echo "make verify  — 論文が述べている数値を生データから再計算して突き合わせる"
+	@echo "make smoke   - check that all three entry levels run (a handful of rollouts)"
+	@echo "make paper   - regenerate the paper tables and figures from results/paper/ into analysis/out/"
+	@echo "make verify  - recompute the numbers the paper states, from the raw records"
 
 smoke:
 	cd examples && PYTHONPATH=..:. MUJOCO_GL=egl $(PY) 01_dropin.py

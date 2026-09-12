@@ -1,9 +1,12 @@
-"""プロセス間で観測と action をやり取りする最小のフレーミング。
+"""The minimal framing used to move observations and actions between processes.
 
-**pickle を使わない。** サーバ（Python 3.13 / numpy 2.x）とクライアント（Python 3.10 /
-numpy 1.26）で pickle 互換性が保証されないため、
-  [4byte 長][JSON ヘッダ][生バイト列]
-の形式にする。ヘッダに各配列の dtype と shape を書く。
+**No pickle.** The server and the client deliberately run different Python and numpy versions
+(3.13 / numpy 2.x on one side, 3.10 / numpy 1.26 on the other), and pickle compatibility across
+those is not guaranteed. The format is
+
+  [4-byte length][JSON header][raw array bytes]
+
+with the header carrying each array's dtype and shape.
 """
 import json, socket, struct
 import numpy as np
@@ -25,7 +28,7 @@ def _recvall(sock, n):
     buf = bytearray()
     while len(buf) < n:
         c = sock.recv(n - len(buf))
-        if not c: raise ConnectionError("接続が切れました")
+        if not c: raise ConnectionError("connection closed")
         buf += c
     return bytes(buf)
 

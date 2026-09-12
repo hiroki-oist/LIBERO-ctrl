@@ -1,8 +1,9 @@
-"""LIBERO-CTRL の drop-in API。**既存の LIBERO 評価ループを2行変えるだけで使える。**
+"""The drop-in API: an existing LIBERO evaluation loop adopts LIBERO-CTRL by changing two lines.
 
-採用障壁を下げることが設計要件である。実装が面倒なベンチマークは使われない。
+Keeping that cost at two lines is a design requirement, not a nicety. A benchmark that is
+troublesome to wire up does not get used.
 
-  # 既存の LIBERO
+  # existing LIBERO
   from libero.libero import benchmark
   bm = benchmark.get_benchmark_dict()["libero_spatial"]()
   task = bm.get_task(i)
@@ -11,25 +12,27 @@
   for t in range(max_steps):
       obs, r, done, info = env.step(policy(obs, task.language))
 
-  # LIBERO-CTRL（変更は import と env 生成の2行だけ）
+  # LIBERO-CTRL (the import and the env construction are the only changes)
   from libero_ctrl import benchmark
   bm = benchmark.get_benchmark_dict()["libero_ctrl_spatial"]()
-  task = bm.get_task(i)                      # i は (task x axis x level x config) を走る
+  task = bm.get_task(i)                      # i runs over (task x axis x level x config)
   env = bm.make_env(i, camera_heights=256, camera_widths=256)
   env.reset(); env.set_init_state(bm.get_init_state(i))
   for t in range(task.max_steps):
       obs, r, done, info = env.step(policy(obs, task.language))
 
-**なぜ bddl の差し替えでは足りないか**: LIBERO-Plus は摂動を bddl（シーン定義）で表現できたが、
-LIBERO-CTRL の sensor（観測の劣化）と actuation（行動の系統誤差）は bddl では原理的に書けない。
-そこで env のラッパーが内側で全部を面倒みる:
+Why shipping perturbed BDDL files is not enough: LIBERO-Plus could express its perturbations
+as scene definitions, but two of ours cannot be written in BDDL even in principle. `sensor`
+degrades the observation after rendering, and `actuation` perturbs the action on its way to the
+controller. So the env wrapper takes care of all of it from the inside:
 
-  camera / lighting -> reset 後に sim.model.* を上書き
-  robot             -> set_init_state に渡す状態を IK で作り替える
-  sensor            -> step() が返す観測を劣化させる
-  actuation         -> step() に渡された action を変換する
-  language          -> task.language に摂動後の指示文が入っている
-  什器配置          -> env 構築と reset の直前にシードを固定（§ LIBERO の再現性の穴）
+  camera / lighting -> overwrite sim.model.* after reset
+  robot             -> rebuild the state handed to set_init_state, by IK
+  sensor            -> degrade the observation returned by step()
+  actuation         -> transform the action passed to step()
+  language          -> task.language already holds the perturbed instruction
+  fixture placement -> seed immediately before env construction and before reset
+                       (this is the reproducibility hole LIBERO leaves open)
 """
 from __future__ import annotations
 import json, os, sys
@@ -47,7 +50,7 @@ SPLITS = {"clean": "rollouts_clean.jsonl", "eval": "rollouts_eval.jsonl",
 
 @dataclass(frozen=True)
 class CtrlTask:
-    """LIBERO の Task と同じ気持ちで使える。`language` と `max_steps` が主。"""
+    """Used the way LIBERO's own Task is used; `language` and `max_steps` are what matter."""
     rollout_id: str
     language: str
     max_steps: int
@@ -67,11 +70,11 @@ class CtrlTask:
 
     @property
     def seed(self) -> int:
-        """方策内部の乱数に使う種。rollout_id から決定論的に決まる。"""
+        """Seed for the policy's own randomness, derived deterministically from rollout_id."""
         from .manifest import rollout_seed
         return rollout_seed(self.rollout_id)
 
-    # LIBERO の Task 互換のための別名
+    # aliases for LIBERO Task compatibility
     @property
     def name(self) -> str: return self.rollout_id
     @property
@@ -79,23 +82,24 @@ class CtrlTask:
 
 
 class CtrlEnv:
-    """LIBERO の OffScreenRenderEnv と同じインタフェースのラッパー。
+    """A wrapper with the same interface as LIBERO's OffScreenRenderEnv.
 
-    1 プロセスにつき1つだけ開くこと（複数の LIBERO env を同一プロセスで開くと
-    EGL のレンダリングコンテキストが混ざって描画が壊れる）。
+    Open exactly one per process
+    (two live LIBERO envs in one process mix up their EGL rendering contexts and the renders
+    come out wrong).
     """
 
     def __init__(self, task: CtrlTask, *, camera_heights=256, camera_widths=256,
                  env_seed: int | None = None, **kwargs):
         from ._task import Task as _T, seed_env
         self._seed = env_seed if env_seed is not None else _default_seed()
-        seed_env(self._seed)                       # ★構築の直前
+        seed_env(self._seed)                       # immediately before construction
         self._t = _T(task.suite, task.task_id, H=camera_heights, W=camera_widths, seed=self._seed)
         self.res = (camera_heights, camera_widths)
         self._p = None
         self.configure(task)
 
-    # ---- LIBERO 互換のプロパティ
+    # ---- LIBERO-compatible properties
     @property
     def env(self): return self._t.env.env
     @property
@@ -104,10 +108,10 @@ class CtrlEnv:
     def task(self) -> CtrlTask: return self._task
 
     def configure(self, task: CtrlTask) -> None:
-        """条件を差し替える。同じ (suite, task_id) の別条件に使い回せる。"""
+        """Swap in another condition. Reusable across conditions of the same (suite, task_id)."""
         from .perturb import PerturbSpec, build
         if task.suite != self._t.suite_name or task.task_id != self._t.ti:
-            raise ValueError("別タスクには使い回せない。新しい env を作ること。")
+            raise ValueError("cannot be reused for a different task; construct a new env")
         self._task = task
         spec = PerturbSpec(axis=task.axis, level=task.level, config=task.config,
                            params=dict(task.perturb or {}), rollout_id=task.rollout_id)
@@ -115,7 +119,8 @@ class CtrlEnv:
         self._p.reset(task.seed)
 
     def reset(self):
-        """LIBERO と同じく full reset。什器配置を固定するため直前にシードを張る。"""
+        """A full reset, as LIBERO does. The seed is applied just before it, so that the
+        fixtures land in the same place."""
         from .env import env_reset
         env_reset(self._t)
         self._t.reset_model()
@@ -124,14 +129,14 @@ class CtrlEnv:
         return self._wrap_obs(obs)
 
     def set_init_state(self, state):
-        """robot 軸はここで効く（IK で EEF をずらした状態にする）。"""
+        """This is where the robot axis applies: IK displaces the end effector."""
         st = self._p.transform_init_state(self._t, np.asarray(state))
         self._t.env.set_init_state(st)
         self._t.sim.forward()
         return self._wrap_obs(self.env._get_observations())
 
     def step(self, action):
-        """actuation 軸を action に、sensor 軸を観測に適用する。"""
+        """Applies the actuation axis to the action and the sensor axis to the observation."""
         a = self._p.transform_action(np.asarray(action, float))
         self.env.done = False
         obs, r, done, info = self._t.env.step(a)
@@ -147,13 +152,13 @@ class CtrlEnv:
         from .env import close_task
         close_task(self._t)
 
-    # ---- 内部
+    # ---- internals
     def _wrap_obs(self, obs):
-        """画像は robosuite の生の向きのまま返す（LIBERO 本家と同じ）。
-        向きの規約はモデルごとに違うので、ここでは決め打ちしない。"""
-        # ★ sensor 軸だけでなく combination 軸（Composite の中に SensorPerturb が
-        #    入る）でも効かせる必要がある。無摂動時 transform_obs は恒等なので
-        #    無条件に通してよい。
+        """Images come back in robosuite's raw orientation, as in LIBERO itself. The
+        convention differs between released checkpoints, so it is not decided here."""
+        # This has to fire on the combination axis too, where the SensorPerturb sits inside a
+        # Composite -- not only when the perturbation *is* a SensorPerturb. transform_obs is
+        # the identity when there is nothing to apply, so it is safe to always go through it.
         out = dict(obs)
         for k in ("agentview_image", "robot0_eye_in_hand_image"):
             if k in out: out[k] = self._p.transform_obs(out[k])
@@ -170,18 +175,18 @@ def _default_seed() -> int:
 
 
 class CtrlBenchmark:
-    """1 suite ぶんの条件列。`get_task(i)` / `get_init_state(i)` / `make_env(i)`。"""
+    """The conditions of one suite. `get_task(i)` / `get_init_state(i)` / `make_env(i)`."""
 
     def __init__(self, suite: str, split: str = "eval"):
-        if suite not in SUITES: raise ValueError(f"未知の suite: {suite}")
-        if split not in SPLITS: raise ValueError(f"未知の split: {split}")
+        if suite not in SUITES: raise ValueError(f"unknown suite: {suite}")
+        if split not in SPLITS: raise ValueError(f"unknown split: {split}")
         self.suite, self.split = suite, split
         self._bddl = _bddl_map(suite)
         self.rows = [r for r in _read(os.path.join(MANIFEST_DIR, SPLITS[split]))
                      if r["suite"] == suite]
         self._init = _init_states(suite)
 
-    # ---- LIBERO 互換
+    # ---- LIBERO compatibility
     @property
     def n_tasks(self) -> int: return len(self.rows)
     def __len__(self) -> int: return len(self.rows)
@@ -207,7 +212,8 @@ class CtrlBenchmark:
         return CtrlEnv(self.get_task(i), **kwargs)
 
     def indices(self, *, axis=None, level=None, task_id=None) -> list[int]:
-        """軸やレベルで絞り込む。全 9,200 を回さず一部だけ試すとき用。"""
+        """Narrow by axis, level or task, so that a subset can be tried without running all
+        of them."""
         out = []
         for i, r in enumerate(self.rows):
             if axis is not None and r["axis"] != axis: continue
@@ -241,7 +247,7 @@ def _init_states(suite):
 
 
 def get_benchmark_dict(split: str = "eval"):
-    """LIBERO の `benchmark.get_benchmark_dict()` と同じ使い方。
+    """Used exactly like LIBERO's own `benchmark.get_benchmark_dict()`.
 
       bm = get_benchmark_dict()["libero_ctrl_spatial"]()
     """

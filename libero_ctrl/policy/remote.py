@@ -1,15 +1,17 @@
-"""別プロセスで動く方策サーバのクライアント。
+"""Client for a policy server running in a separate process.
 
-依存関係が我々のスタック（Python 3.10 / MuJoCo 2.3.7 / robosuite 1.4.0）と
-両立しない方策を、env 側を一切変えずに評価するための仕組み。
-MINERVA は Python 3.13 / MuJoCo 3.3.2 を要求するのでこれを使う。
+This is how a policy whose dependencies cannot coexist with the env stack
+(Python 3.10 / MuJoCo 2.3.7 / robosuite 1.4.0) is evaluated without changing anything on the
+env side. Five of the seven policies in the paper need it; one of them requires
+Python 3.13 and MuJoCo 3.3.2.
 """
 import socket, numpy as np
 from .wire import send, recv
 
 
 class RemotePolicy:
-    """observation を送って action を受け取るだけ。向きや正規化はサーバ側の責務。"""
+    """Send an observation, receive an action. Orientation and normalisation are the
+    server's responsibility, not the benchmark's."""
 
     def __init__(self, sock_path: str, name: str = "remote", task_string: str | None = None):
         self.name = name
@@ -18,12 +20,12 @@ class RemotePolicy:
         send(self.s, dict(cmd="ping")); h, _ = recv(self.s)
         if not h.get("ok"): raise RuntimeError(h)
         self.n_params = h.get("params")
-        self.task_string = task_string        # ★常にこれを送る（= タスク番号を無料で与える）
+        self.task_string = task_string        # when set, this string is sent instead of the row's
 
     def set_task_string(self, s: str): self.task_string = s
 
     def reset(self, language: str, *, seed: int) -> None:
-        # task_string が設定されていればそれを使う（oracle）。無ければ row の指示文（literal）。
+        # Use task_string when one was set; otherwise the row's own instruction.
         self._task = self.task_string if self.task_string is not None else language
         send(self.s, dict(cmd="reset", task=self._task, seed=int(seed)))
         h, _ = recv(self.s)

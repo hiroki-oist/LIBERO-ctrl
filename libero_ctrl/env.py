@@ -1,19 +1,18 @@
-"""env の構築と1 rollout の実行。
+"""Constructing the env, and the invariants around it.
 
-★守るべき2つの不変条件（どちらも実測で痛い目を見ている）:
+Two rules, both learned the hard way:
 
- 1. **env 構築の直前に seed_env() を呼ぶ。**
-    LIBERO の 92次元 sim state には静的 body（什器）の配置が入っていない。
-    棚・コンロは env 構築時に robosuite の配置サンプラが乱数で置くため、
-    シードしないと同じタスク・同じ init_id でも実行のたびに位置と傾きが変わる
-    （libero_spatial 全10タスクで 6.5〜18.8mm。他3 suite は什器が無いので影響なし）。
-    set_init_state では戻らない。
+ 1. **Call seed_env() immediately before constructing the env.**
+    LIBERO's 92-dimensional sim state does not contain the placement of static bodies. Shelves
+    and stoves are positioned by robosuite's placement sampler at construction time, so without
+    a seed the same task with the same init_id puts them somewhere slightly different on every
+    run (6.5-18.8 mm across the ten libero_spatial tasks; the other three suites have no such
+    fixtures and are unaffected). set_init_state does not bring them back.
 
- 2. **1プロセスにつき env は1つ。**
-    複数の LIBERO env を同時に開くと EGL のレンダリングコンテキストが混ざり、
-    深度も RGB も壊れる（別プロセスでも同一 GPU 上で同時に開くと影響する）。
-    並列化は「プロセスを分け、かつ同時に env を開かない」ではなく
-    **GPU ごとに1プロセス**で行う。
+ 2. **One env per process.**
+    Two live LIBERO envs mix up their EGL rendering contexts and both depth and RGB come out
+    wrong -- this happens even across processes when they share a GPU. So parallelism is
+    one process per GPU, not several envs per process.
 """
 import os, sys, numpy as np
 
@@ -21,12 +20,12 @@ _OPEN: dict = {}
 
 
 def make_task(suite: str, task_id: int, *, res: int, seed: int):
-    """Task を作る。同一プロセス内で2つ目を開こうとしたら止める。"""
+    """Build a Task, refusing to open a second one in the same process."""
     from ._task import Task, seed_env
     if _OPEN:
-        raise RuntimeError(f"env が既に開いている（{_OPEN}）。1プロセス1 env を守ること。"
-                           f" EGL コンテキストが混ざって描画が壊れる。")
-    seed_env(seed)                       # ★構築の直前
+        raise RuntimeError(f"an env is already open ({_OPEN}); one env per process. "
+                           f"EGL contexts get mixed up and the renders break.")
+    seed_env(seed)                       # immediately before construction
     t = Task(suite, task_id, H=res, W=res, seed=seed)
     _OPEN[(suite, task_id)] = True
     return t
@@ -37,16 +36,16 @@ def close_task(task):
 
 
 def soft_reset(task):
-    """★1 rollout の開始前に必ず呼ぶ。**コントローラの内部状態を消す。**
+    """Clear the controller's internal state. Must be called before every rollout.
 
-    set_init_state は qpos/qvel を書き戻すだけで、OSC コントローラが持っている
-    目標姿勢・積分項は前の rollout のまま残る。これを消さないと、同じ条件でも
-    「プロセスの1本目は成功、2本目以降は失敗」という持ち越しが起きる
-    （libero_spatial t0 で 100% -> 10% に化けた。2026-09-04 実測）。
+    set_init_state writes back qpos/qvel only; the OSC controller's target pose and integral
+    terms survive from the previous rollout. Left alone, this produces a carry-over where the
+    first rollout in a process succeeds and later ones fail under identical conditions
+    (measured: libero_spatial task 0 went from 100% to 10%).
 
-    LIBERO 本家の評価は毎エピソード env.reset() を呼んでこれを避けているが、
-    reset() はモデルとレンダラを作り直すので 1 rollout あたり数秒かかる。
-    コントローラだけ戻せば十分で、こちらは無視できるコスト。
+    LIBERO's own evaluation avoids this by calling env.reset() every episode, but reset()
+    rebuilds the model and the renderer and costs seconds per rollout. Resetting the controller
+    alone is sufficient and costs nothing measurable.
     """
     for robot in task.env.env.robots:
         c = getattr(robot, "controller", None)
@@ -66,7 +65,7 @@ def soft_reset(task):
 
 
 def sim_reset(task):
-    """mjData を初期化してからコントローラを戻す。モデルは作り直さないので速い。"""
+    """Reinitialise mjData, then reset the controller. The model is not rebuilt, so it is fast."""
     task.sim.reset()
     task.sim.data.ctrl[:] = 0
     for robot in task.env.env.robots:
@@ -79,8 +78,9 @@ def sim_reset(task):
 
 
 def env_reset(task):
-    """LIBERO 本家の評価と同じ full reset。モデルとレンダラを作り直すので遅い。
-    什器配置が再抽選されるので **必ず seed_env を先に呼ぶ**。"""
+    """The full reset LIBERO's own evaluation performs. It rebuilds the model and the
+    renderer, so it is slow, and it re-draws the fixture placement -- which is why seed_env
+    must be called first."""
     from ._task import seed_env
     seed_env(task.seed)
     task.env.reset()
@@ -90,7 +90,8 @@ def env_reset(task):
 
 
 def warmup(task, state, n_steps: int):
-    """LIBERO の init は物体を 7-16cm 浮かせているので、方策を動かす前に静定させる。"""
+    """LIBERO's initial states float the objects 7-16 cm above the surface, so let them settle
+    before the policy is allowed to act."""
     task.env.set_init_state(state); task.sim.forward()
     a = np.zeros(task.env.env.action_dim); a[-1] = -1.0
     for _ in range(n_steps):

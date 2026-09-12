@@ -1,8 +1,8 @@
-"""方策アダプタの規約。
+"""The contract a policy adapter has to satisfy.
 
-runner は **manifest の行にある指示文をそのまま渡す**。
-env や bddl のファイル名から導出してはならない（LIBERO-Plus はそれで
-全非言語軸の指示文に摂動タグが混入していた）。
+The runner passes the instruction **exactly as the manifest row gives it**. It must never be
+derived from the env or from a BDDL filename: LIBERO-Plus did that, and perturbation tags
+leaked into the instruction on every non-language axis as a result.
 """
 from typing import Protocol
 import numpy as np
@@ -12,14 +12,14 @@ class Policy(Protocol):
     name: str
 
     def reset(self, language: str, *, seed: int) -> None:
-        """1 rollout の開始。指示文はここで受け取る。"""
+        """Start of one rollout. The instruction arrives here."""
 
     def act(self, agentview: np.ndarray, wrist: np.ndarray, obs: dict) -> np.ndarray:
-        """(7,) の action を返す。"""
+        """Return a (7,) action."""
 
 
 class ScriptedNoop:
-    """疎通確認用。何もしない（gripper だけ開く）。"""
+    """A do-nothing policy for wiring checks; it only opens the gripper."""
     name = "noop"
 
     def reset(self, language: str, *, seed: int) -> None: self.lang = language

@@ -1,13 +1,14 @@
-"""摂動の適用点は4種類ある。軸ごとに「どこに効くか」が違う。
+"""Where each axis is applied. Four hook points, plus the instruction string.
 
-  model  : env の reset 後に sim.model.* を書き換える（camera / lighting）
-  state  : set_init_state に渡す状態そのものを作り替える（robot）
-  obs    : 描画された観測を後段で劣化させる（sensor）
-  action : 方策が出した action を実行前に変換する（actuation）
-  text   : 指示文（language。manifest の行が実体を持つので runner は渡すだけ）
+  model  : overwrite sim.model.* after the env has been reset   (camera, lighting)
+  state  : rebuild the state handed to set_init_state           (robot)
+  obs    : degrade the rendered observation                     (sensor)
+  action : transform the action before it reaches the env       (actuation)
+  text   : the instruction itself -- the manifest row carries it, the runner only
+           passes it through                                    (language)
 
-Perturbation はこの4つのフックを持ち、既定では何もしない。
-1 rollout につき **ちょうど1軸だけ**が非恒等になる（runner が assert する）。
+`Perturbation` exposes those four hooks and does nothing by default. Exactly one axis is
+non-identity in any single rollout, and the runner asserts it.
 """
 from dataclasses import dataclass, field
 from typing import Any
@@ -18,16 +19,16 @@ AXES = ("camera", "lighting", "robot", "sensor", "actuation", "language",
 
 @dataclass(frozen=True)
 class PerturbSpec:
-    """manifest の1行が指定する摂動。実行時に乱数を引かない。"""
+    """The perturbation a manifest row asks for. Nothing is sampled at run time."""
     axis: str
-    level: str                      # L0(clean) / L1 / L2 / L3
+    level: str                      # L0 (clean) / L1 / L2 / L3
     config: int | None = None
     params: dict[str, Any] = field(default_factory=dict)
     rollout_id: str = ""
 
     def __post_init__(self):
         if self.axis not in AXES:
-            raise ValueError(f"未知の軸: {self.axis}")
+            raise ValueError(f"unknown axis: {self.axis}")
 
     @classmethod
     def from_row(cls, row: dict) -> "PerturbSpec":
@@ -36,7 +37,7 @@ class PerturbSpec:
 
 
 class Perturbation:
-    """既定では恒等。軸ごとに必要なフックだけを上書きする。"""
+    """Identity by default; each axis overrides only the hooks it needs."""
     axis = "clean"
 
     def apply_model(self, task) -> None: ...
@@ -44,7 +45,7 @@ class Perturbation:
     def transform_obs(self, img): return img
     def transform_action(self, a): return a
     def reset(self, seed: int) -> None:
-        """1 rollout の開始時。rollout 内で固定すべき乱数要素をここで決める。"""
+        """Called once at the start of a rollout: fix anything that must stay fixed within it."""
 
     @property
     def is_identity(self) -> bool:
@@ -52,15 +53,18 @@ class Perturbation:
 
 
 class Composite(Perturbation):
-    """★軸7 Combination。6軸を**同時に**かける。
+    """The seventh axis: all six single axes applied *simultaneously*.
 
-    他の6軸は「1 rollout = 1 因子」を守るが、この軸は意図的にそれを破る。
-    実運用では複数の変動が同時に起きるので、単一因子の和で予測できるかを見るための軸である。
-    severity は「全軸を同じレベルにする」で定義する（各軸が半径 r なら、
-    結合空間では sqrt(6)*r 相当になるので、単一軸の L3 より強い）。
+    The other six axes each hold to "one rollout, one factor". This axis deliberately breaks
+    that, because in deployment several things vary at once, and the question the benchmark
+    asks is whether the simultaneous outcome is predictable from the single-axis ones.
 
-    config j は **各軸の config j を束ねたもの**（camera c_j + lighting c_j + ... + language 変種 j）。
-    これで config と init slot の 1:1 対応が他の軸と揃う。
+    Severity is defined as "every axis at the same level". Six axes at radius r are at
+    sqrt(6)*r in the joint space, so combination L1 is already stronger than any single-axis L3.
+
+    Config j bundles config j of every axis (camera c_j + lighting c_j + ... + paraphrase j),
+    which keeps the 1:1 correspondence between config and initial-state slot that the single
+    axes have.
     """
     axis = "combination"
 
@@ -94,12 +98,13 @@ class Composite(Perturbation):
 
 
 def build(spec: PerturbSpec, *, suite: str, shape: tuple[int, int]) -> Perturbation:
-    """spec から摂動器を作る。language と clean は恒等（指示文は行が実体を持つ）。"""
+    """Build the perturbation for a spec. `language` and `clean` are identity here, because
+    the instruction is carried by the manifest row rather than applied to the env."""
     if spec.axis == "combination":
-        # params は軸名 -> その軸のパラメータ辞書
+        # params maps axis name -> that axis's parameter dict
         parts = []
         for ax, pr in spec.params.items():
-            if ax == "language": continue          # 指示文は row の language に入っている
+            if ax == "language": continue          # the paraphrase is in row["language"]
             parts.append(build(PerturbSpec(axis=ax, level=spec.level, config=spec.config,
                                            params=pr, rollout_id=spec.rollout_id),
                                suite=suite, shape=shape))

@@ -1,43 +1,49 @@
-"""軸6 Actuation Error。「指令した先に行かない」系統誤差を runner 側の action 変換で作る。
+"""Axis 6, actuation error: systematic error between what the policy commands and what the
+arm does, implemented purely as a transform on the action.
 
-パラメータ空間（5次元）。すべて action 変換だけで、model には触らない。
-  0 gain_log2     指令変位が 2^d 倍で実行される（スケール誤差）         系統
-  1 bias_frac     固定方向への一定オフセット（キャリブレーション誤差）  系統
-  2 misalign_deg  指令座標系が固定軸まわりに θ 回転している            系統
-  3 lag_tau       一次遅れ時定数（制御ステップ）                        系統
-  4 noise_frac    ランダムノイズ σ                                      ランダム
+Five parameters; none of them touches the model.
+  0 gain_log2     commanded displacement executed at 2^d times scale   systematic
+  1 bias_frac     constant offset along a fixed direction              systematic
+  2 misalign_deg  command frame rotated by theta about a fixed axis    systematic
+  3 lag_tau       first-order lag time constant, in control steps      systematic
+  4 noise_frac    random noise sigma                                   random
 
-bias と noise は **デモの action 大きさ**にアンカーする。回転の action は並進の約 1/7
-（‖a_rot‖ RMS 0.10 対 ‖a_trans‖ RMS 0.72）なので、並進群・回転群それぞれの RMS で
-スケールしないと片方だけ過大になる。gripper 次元（常に ±1 の二値）は摂動しない。
+Bias and noise are anchored to the magnitude of the demonstration actions. Rotational actions
+are about a seventh the size of translational ones (RMS 0.10 against 0.72), so each group is
+scaled by its own RMS; using a single scale would make one of them dominate. The gripper
+dimension is binary (always +/-1) and is never perturbed.
 """
 import numpy as np
 
 KEYS = ["gain_log2", "bias_frac", "misalign_deg", "lag_tau", "noise_frac"]
-# 1 unit は **EEF の追従誤差**にアンカーする。デモ action の開ループ再生で
-# 各パラメータの「r あたりの EEF 最大ずれ」を実測し、単独 r=8 で 20mm になるよう逆算した。
+# One unit is anchored to end-effector tracking error. Each parameter's worst-case
+# end-effector displacement per unit radius was measured by open-loop replay of the
+# demonstration actions, then inverted so that r = 8 along a single parameter gives 20 mm.
 #
-# 参照する実機は2クラス:
-#   研究用（Franka Panda）: 繰り返し ~0.1mm / 絶対精度 ~1mm / 追従誤差 2-10mm / 最悪 ~20mm
-#   低価格（SO-101, Feetech STS3215）: 繰り返し 0.17deg / バックラッシュ 1-2mm@100mm レバー
-#     （負荷時 1.30deg）-> EEF 換算で概ね 10-30mm
-# -> L1 = 10mm（良好な低価格 / 並の研究用）, L2 = 20mm（研究用の最悪 = 典型的 SO-101）,
-#    L3 = 40mm（負荷とバックラッシュが乗った SO-101、校正不良）
+# Two classes of real hardware were used as the reference:
+#   research-grade (Franka Panda): repeatability ~0.1 mm, absolute accuracy ~1 mm,
+#     tracking error 2-10 mm, worst case ~20 mm
+#   low-cost (SO-101, Feetech STS3215): repeatability 0.17 deg, backlash 1-2 mm on a 100 mm
+#     lever (1.30 deg under load) -> roughly 10-30 mm at the end effector
+# so L1 = 10 mm (a good low-cost arm, or an ordinary research one), L2 = 20 mm (worst case for
+# research-grade, typical for SO-101), L3 = 40 mm (SO-101 under load, poorly calibrated).
 #
-# 単独 r=8 での実量（すべて低価格アームとしてあり得る水準）:
-#   gain x1.082 / bias 5.95% / misalign 7.17deg / lag 2.60 step (130ms) / noise sigma 18.8%
-# 意図的に強くしすぎない。実機であり得ない値（gain x2 等）にすると軸の説得力が失われる。
+# What r = 8 along a single parameter actually amounts to -- all of it plausible on a low-cost
+# arm: gain x1.082, bias 5.95%, misalignment 7.17 deg, lag 2.60 steps (130 ms), noise sigma
+# 18.8%. Deliberately not stronger than that: values no real arm exhibits (gain x2, say) would
+# cost the axis its credibility.
 UNIT = np.array([0.01432, 0.00744, 0.89606, 0.32468, 0.02350])
-# lag と noise は絶対値しか効かない（±で同じ）ので半空間からサンプルする
+# lag and noise depend only on magnitude, so they are sampled from a half-space
 HALF_SPACE = [3, 4]
 MULT = {"L1": 2.0, "L2": 4.0, "L3": 8.0}
-# デモ実測（suite ごと。translation / rotation の action 大きさ RMS）
+# measured on the demonstrations, per suite: RMS action magnitude (translation, rotation)
 DEMO_RMS = {"libero_spatial": (0.785, 0.102), "libero_object": (0.697, 0.072),
             "libero_goal": (0.739, 0.143), "libero_10": (0.581, 0.113)}
 
 
 def params(level, direction):
-    """direction は単位球面上の 5 次元ベクトル。lag と noise の成分は絶対値を取る。"""
+    """`direction` is a five-dimensional unit vector; the lag and noise components are taken
+    in absolute value."""
     v = np.asarray(direction, float).copy()
     for i in HALF_SPACE: v[i] = abs(v[i])
     return dict(zip(KEYS, MULT[level] * v * UNIT))
@@ -50,7 +56,8 @@ def _rot(axis, ang):
 
 
 class ActuationError:
-    """1 rollout ぶんの action 変換。固定方向・固定軸は seed から一度だけ決める。"""
+    """The action transform for one rollout. The bias direction and misalignment axis are
+    drawn once from the seed and then held fixed."""
 
     def __init__(self, p, seed, suite="libero_spatial"):
         self.p = p
@@ -67,7 +74,8 @@ class ActuationError:
         self.tau = abs(p.get("lag_tau", 0.0))
         self.alpha = 1.0 / (1.0 + self.tau) if self.tau > 1e-9 else 1.0
         self.sigma = abs(p.get("noise_frac", 0.0)) * self.scale
-        self.state = np.zeros(6)          # ★遅れの初期値はゼロ（指令値で初期化すると遅れが消える）
+        self.state = np.zeros(6)          # lag starts at zero; seeding it with the command
+                                          # would cancel the lag on the first step
 
     def __call__(self, a):
         a = np.asarray(a, float).copy()

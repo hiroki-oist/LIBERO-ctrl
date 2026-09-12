@@ -1,9 +1,9 @@
-"""Fig.1 を manuscript_numbers.json から生成する。本文の表と同じ数値になることを保証するため、
-   ここで再集計はせず json だけを読む。"""
+"""Build the composition figure from manuscript_numbers.json. Nothing is re-aggregated here;
+the json is read as-is, so the figure cannot disagree with the tables."""
 
 import os as _os
-# ★結果は results/paper/<run名>/rollouts.jsonl に統合済み（fuji と taketomi の両方を、
-#   taketomi 優先でマージ）。旧リポジトリの /tmp/tkpull による上書きはもう不要。
+# Results live at results/paper/<run>/rollouts.jsonl, already merged across the machines
+# they were collected on (see docs/RESULTS_INDEX.md for the merge rule).
 ROOT = _os.environ.get("LIBERO_CTRL_ROOT",
        _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))
 RESULTS = _os.path.join(ROOT, "results", "paper")
@@ -22,7 +22,7 @@ LAB={"MINERVA":"MINERVA","SmolVLA":"SmolVLA","VLA-JEPA":"VLA-JEPA","pi05":r"$\pi
 COL={"MINERVA":"#4C72B0","SmolVLA":"#55A868","VLA-JEPA":"#C44E52","pi05":"#8172B2",
      "OpenVLA-OFT":"#CCB974","UniVLA":"#64B5CD"}
 MK={"L1":"o","L2":"s","L3":"^"}
-FLOOR=10.0   # 予測がこれ未満のセルは残差を解像できない（本文 §Results と同一基準）
+FLOOR=10.0   # below this predicted value the residual is not resolvable (same criterion as the paper)
 fig,axs=plt.subplots(1,2,figsize=(11.5,4.9))
 ax=axs[0]
 ax.plot([0,100],[0,100],"k--",lw=1,alpha=.55,zorder=0)
@@ -74,4 +74,4 @@ fig.tight_layout(rect=[0,0.07,1,1])
 for p in (f"{OUT_DIR}/composition.png", f"{OUT_DIR}/composition.pdf"):
     fig.savefig(p,dpi=200,bbox_inches="tight")
 print(f"saved -> {OUT_DIR}/composition.png")
-print(f"残差の傾き（床セル除外 n={len(xs)}）: {sl:+.4f} pp/pp")
+print(f"residual slope (floor cells excluded, n={len(xs)}): {sl:+.4f} pp/pp")

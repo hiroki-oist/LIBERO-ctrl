@@ -1,21 +1,26 @@
-"""同時条件のズレを「脆弱性の依存性」と「重畳効果」に厳密に分解する。
+"""Decompose the simultaneous-condition gap exactly, into a dependence term and a
+superposition term.
 
-  S_indep = Π_a P(生存_a)      6軸の生存指標が独立なときの P(全生存)
-  S_conj  = 観測した P(全生存)  単軸データのみから決まる
-  S_sim   = 同時条件の成功率    ここで初めて同時データが入る
+  S_indep = prod_a P(survive_a)   P(survive all) if the six survival indicators were independent
+  S_conj  = observed P(survive all), determined by the single-axis data alone
+  S_sim   = the simultaneous success rate -- the first quantity that uses simultaneous data
 
-  S_sim − S_indep = (S_conj − S_indep) + (S_sim − S_conj)
-                    ~~~~~~~~~~~~~~~~~    ~~~~~~~~~~~~~~~
-                    依存性（interaction ではない）  重畳効果（唯一の interaction）
+  S_sim - S_indep = (S_conj - S_indep) + (S_sim - S_conj)
+                     ~~~~~~~~~~~~~~~~     ~~~~~~~~~~~~~~~
+                     dependence           superposition
+                     (not an interaction) (the only interaction)
 
-★論文の積モデル S_prod = clean × Π(SR_a/clean) は clean で条件付けているぶん
-  S_indep より系統的に高く、差を「依存性」と呼ぶと符号が反転する。基準は S_indep を使う。
-★clean 成功軌道に限定すると clean=100% なので S_indep と S_prod が一致し、基準の恣意性が消える。
+The product model used in the paper, S_prod = clean * prod(SR_a / clean), conditions on the
+nominal rate and so sits systematically above S_indep; calling that difference "dependence"
+flips its sign. S_indep is the reference used here.
+
+Restricted to trajectories that succeed nominally, clean = 100%, so S_indep and S_prod coincide
+and the choice of reference stops mattering.
 """
 
 import os as _os
-# ★結果は results/paper/<run名>/rollouts.jsonl に統合済み（fuji と taketomi の両方を、
-#   taketomi 優先でマージ）。旧リポジトリの /tmp/tkpull による上書きはもう不要。
+# Results live at results/paper/<run>/rollouts.jsonl, already merged across the machines
+# they were collected on (see docs/RESULTS_INDEX.md for the merge rule).
 ROOT = _os.environ.get("LIBERO_CTRL_ROOT",
        _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))
 RESULTS = _os.path.join(ROOT, "results", "paper")
@@ -29,7 +34,7 @@ from math import comb
 AX = ("camera","lighting","robot","sensor","actuation","language")
 LV = ("L1","L2","L3")
 tk = collections.defaultdict(list)
-# 統合済みなので追加の読み込み元は無い
+# results are already merged; nothing else to read
 def load(ds):
     o = {}
     for d in ds:
@@ -65,7 +70,7 @@ def analyse(name, ed, cd, clean_only):
         c = sum(1 for k in ks if k not in set(a1) and unit[k]["combination"])
         Sc = 100*len(a1)/N; Ss = 100*sum(unit[k]["combination"] for k in ks)/N
         nf = N - sum(unit[k]["combination"] for k in ks)
-        # K = 単独で耐えた軸数
+        # K = number of axes survived individually
         KH = collections.defaultdict(lambda: [0,0])
         for k in ks:
             K = sum(unit[k][a] for a in AX)
@@ -76,10 +81,10 @@ def analyse(name, ed, cd, clean_only):
                       K={k_: (100*v[0]/v[1], v[1]) for k_, v in KH.items()})
     return out
 
-for tag, co in (("全軌道", False), ("clean 成功軌道のみ", True)):
+for tag, co in (("all trajectories", False), ("nominally successful trajectories only", True)):
     print(f"\n{'='*94}\n=== {tag} ===")
-    print(f"{'方策':12s}{'L':3s}{'N':>5s}{'S_indep':>8s}{'S_conj':>7s}{'S_sim':>7s} | "
-          f"{'依存性':>7s}{'重畳I':>7s}{'McN':>7s} | {'F_hidden':>9s}")
+    print(f"{'policy':12s}{'L':3s}{'N':>5s}{'S_indep':>8s}{'S_conj':>7s}{'S_sim':>7s} | "
+          f"{'depend':>7s}{'superp':>7s}{'McN':>7s} | {'F_hidden':>9s}")
     print("-"*94)
     for name, ed, cd in POL:
         r = analyse(name, ed, cd, co)

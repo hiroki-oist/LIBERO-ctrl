@@ -8,9 +8,9 @@ version = "0.1.0"
 description = "LIBERO-CTRL: a severity-calibrated, paired, controlled robustness benchmark for VLA policies"
 readme = "README.md"
 requires-python = ">=3.9"
-# ★LIBERO 本体（robosuite 1.4.0 / MuJoCo 2.3.7）は**あえて依存に書かない**。
-#   利用者は既に動く LIBERO 環境を持っている前提で、その環境に本パッケージを入れる。
-#   ここで robosuite を引くと、既存の評価環境のバージョンを壊す。
+# LIBERO itself (robosuite 1.4.0 / MuJoCo 2.3.7) is deliberately NOT a dependency. The user is
+# assumed to already have a working LIBERO environment, and this package is installed into it.
+# Pulling robosuite in here would change the versions of that working evaluation environment.
 dependencies = ["numpy", "scipy", "pillow"]
 
 [project.scripts]

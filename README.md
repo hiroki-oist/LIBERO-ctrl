@@ -148,12 +148,27 @@ Two things have to be pinned that LIBERO itself does not pin:
    per process. Nothing in the runtime draws a random number that is not derived from the
    manifest row.
 
-With both pinned, **four of the seven policies we measured reproduce bit-exactly per rollout**
-(MINERVA, PredVLA, OpenVLA-OFT, UniVLA). The other three (SmolVLA, VLA-JEPA, `π₀.₅`) sample at
-inference and reproduce only in aggregate; we measured their per-rollout flip rate at 6.7%, 10.0%
-and 15.0% respectively over a 60-rollout repeat design, and re-collected 25,200 rollouts
-independently to confirm that the reported superposition effect `I` moves by at most 1.8 points in
-eight of nine policy × level cells.
+With both pinned, four of the seven policies measured here (MINERVA, PredVLA, OpenVLA-OFT,
+UniVLA) are deterministic in the sense that repeating a rollout in a fresh process reproduces its
+outcome. The other three (SmolVLA, VLA-JEPA, `π₀.₅`) sample at inference and reproduce only in
+aggregate; their per-rollout flip rates over a 60-rollout repeat design are 6.7%, 10.0% and 15.0%
+respectively, and 25,200 rollouts were re-collected independently to confirm that the reported
+superposition effect `I` moves by at most 1.8 points in eight of nine policy × level cells.
+
+**Determinism is per GPU, not absolute.** Re-running the 500 nominal LIBERO-Spatial rollouts of
+a deterministic policy through this pipeline and comparing per rollout against the archived
+records:
+
+| policy | GPU | outcomes differing | step counts differing |
+|---|---|---:|---:|
+| OpenVLA-OFT | same as the archive | **0 / 500** | 1 / 500 |
+| UniVLA | different from the archive | 4 / 500 (0.8%) | 141 / 500 (28%) |
+
+The UniVLA server reseeds `torch` and `numpy` at every rollout, so ordering and sharding are ruled
+out; what remains is floating-point non-determinism between GPU models. A 60-rollout repeat test
+has no power to see a 0.8% flip rate, which is why the shorter diagnostics report these policies
+as exactly deterministic. Plan re-runs on the same hardware where per-rollout identity matters,
+and compare in aggregate otherwise.
 
 ### Reproduction gate
 
@@ -184,7 +199,8 @@ documented in `docs/RUNS.md`.
 - **MINERVA cannot accept paraphrases.** It resolves an instruction to an index in a 40-task table,
   so the language and combination axes are undefined for it and it is evaluated on five axes with
   the canonical instruction. Passing a paraphrase raises `KeyError` inside its processor.
-- Comments in the source are in Japanese; the public release will need them translated.
+- Two exploratory scripts (a superseded figure and a lab-notebook summary) were dropped from
+  `analysis/` before release; every script the paper depends on is present.
 
 ## Layout
 
@@ -197,3 +213,7 @@ results/paper/      raw per-rollout records behind the paper
 analysis/           table and figure generation
 docs/               protocol, calibration procedure, exact run commands
 ```
+
+## License
+
+MIT, see `LICENSE`. LIBERO and robosuite, which this builds on, are MIT-licensed as well.

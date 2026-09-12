@@ -1,7 +1,9 @@
-"""軸3 Robot Initial State。関節空間ではなく **EEF 空間**で定義し、減衰最小二乗 IK で解く。
+"""Axis 3, robot initial state: defined in end-effector space rather than joint space, and
+solved with damped least-squares IK.
 
-関節に直接ノイズを載せると同じノイズ量でもタスクによって EEF の変位が桁で変わるため、
-「EEF を何 mm ずらしたか」で severity を定義する。
+Perturbing joint angles directly would move the end effector by wildly different amounts from
+task to task for the same nominal noise, so severity is defined by the end-effector
+displacement in millimetres instead.
 """
 import numpy as np
 from . import Perturbation, PerturbSpec
@@ -11,7 +13,7 @@ class RobotPerturb(Perturbation):
     axis = "robot"
 
     def __init__(self, spec: PerturbSpec, *, suite: str, shape):
-        # manifest はスカラー6個で持つ（ベクトル2個ではない）
+        # the manifest stores six scalars, not two vectors
         P = spec.params
         self.dpos = np.array([P["eef_dx_m"], P["eef_dy_m"], P["eef_dz_m"]], float)
         self.drot = np.radians(np.array([P["eef_rx_deg"], P["eef_ry_deg"], P["eef_rz_deg"]], float))

@@ -1,28 +1,28 @@
-"""LeRobot の方策を別プロセスで常駐させ、我々の env から呼べるようにする（汎用）。
+"""A generic server that keeps a LeRobot policy resident in its own process.
 
-MINERVA / pi0 / pi05 / pi0-FAST / SmolVLA / X-VLA / VLA-JEPA / MolmoAct2 …
-LeRobot に実装がある方策はすべてこの1本で扱える（読み込みも前処理も LeRobot 側の
-`PreTrainedConfig.from_pretrained` + `make_pre_post_processors` + `policy.select_action` に任せる）。
+Any policy LeRobot implements can be served by this one file -- pi0, pi0.5, pi0-FAST, SmolVLA,
+X-VLA, VLA-JEPA and others -- because loading and preprocessing are delegated to LeRobot's own
+`PreTrainedConfig.from_pretrained`, `make_pre_post_processors` and `policy.select_action`.
 
-**なぜサーバにするか**: MINERVA は Python 3.13 / MuJoCo 3.3.2 / LeRobot を要求し、
-我々のスタック（Python 3.10 / MuJoCo 2.3.7 / robosuite 1.4.0）と同一プロセスで同居できない。
-env 側の再現性（校正・solvability を全てこのスタックで作った）を優先し、方策だけを外に出す。
-同じ仕組みで OpenVLA-OFT や pi0 の依存衝突も解ける。
+Why a server: some of these policies require Python 3.13, MuJoCo 3.3.2 and LeRobot, which
+cannot coexist in one process with the env stack (Python 3.10, MuJoCo 2.3.7, robosuite 1.4.0).
+The env side is where calibration and solvability were established, so the env stack wins and
+the policy moves out of the process. The same arrangement resolves the dependency conflicts of
+OpenVLA-OFT and pi0.
 
-**指示文の扱い**: 方策によって意味が違う。
-  MINERVA (tinyflow) : 指示文を 40 エントリの辞書でタスク番号に変換するだけ。言語エンコーダ無し。
-                       -> runner 側で **正規の指示文を常に渡す**（= 番号を無料で与える）診断に使う。
-  pi0 / pi05 / SmolVLA など : 本物の言語エンコーダを持つ。
-                       -> row の指示文（言い換え後）をそのまま渡す。**言語軸が実際に効く。**
-どちらを渡すかは runner の `--task_mode` が決める。サーバは受け取った文をそのまま使う。
+On instructions: the server passes through whatever string it is handed. What that string means
+differs by policy. A policy with a real language encoder (pi0, pi0.5, SmolVLA) sees the
+paraphrase and the language axis genuinely applies. A policy that only maps an instruction to
+an index in a fixed table has no language encoder, and is evaluated with the canonical
+instruction on five axes.
 
-  起動: MINERVA/.venv/bin/python examples/servers/lerobot_server.py \
-          --sock /tmp/pi05.sock --ckpt lerobot/pi05_libero_finetuned_v044
+  start:  <policy venv>/bin/python examples/servers/lerobot_server.py \
+            --sock /tmp/pi05.sock --ckpt <hf repo id or local path>
 """
 import os, sys, argparse, socket, traceback
-# ★torch のスレッド数を 1 に固定する。**import torch より前**に環境変数を置く。
-# MINERVA は 0.55M しかないので CPU 並列の利得はなく、既定（全コア）だと
-# 1 サーバが 4.8 コアを占有して並列実行数が上げられない（2026-09-04 実測）。
+# Pin torch to one thread, and set the environment variables *before* importing torch.
+# A sub-million-parameter policy gains nothing from CPU parallelism, and the default (all
+# cores) has one server occupying 4.8 cores, which caps how many can run side by side.
 for _v in ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS",
            "NUMEXPR_NUM_THREADS", "VECLIB_MAXIMUM_THREADS"):
     os.environ.setdefault(_v, "1")
@@ -30,14 +30,14 @@ import numpy as np, torch
 torch.set_num_threads(1)
 torch.set_num_interop_threads(1)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-# ★通信プロトコルは libero_ctrl/policy/wire.py が正準（コピーを増やさない）。
-#   サーバは方策側の venv で動くのでパッケージとしては import せず、ファイルだけを読む。
+# libero_ctrl/policy/wire.py is the single copy of the wire protocol. The server runs in the
+# policy's venv, so the module file is loaded directly rather than importing the package.
 sys.path.insert(0, os.path.join(os.environ.get("LIBERO_CTRL_ROOT",
     os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))),
     "libero_ctrl", "policy"))
 from wire import send, recv
 
-MINERVA = os.environ.get("MINERVA_HOME", "/home/hiroki/Code/MINERVA")
+MINERVA = os.environ.get("MINERVA_HOME", os.path.expanduser("~/MINERVA"))
 sys.path.insert(0, os.path.join(MINERVA, "src"))
 
 
@@ -56,8 +56,9 @@ def build(ckpt: str, device: str):
         policy_cfg=cfg, pretrained_path=ckpt,
         preprocessor_overrides={"device_processor": {"device": device},
                                 "rename_observations_processor": {"rename_map": {}}})
-    # 画像の 180 度回転と 8 次元 state の組み立ては LiberoProcessorStep が持っている。
-    # 自前で書き直さず、彼らの評価と同じものを使う。
+    # LiberoProcessorStep already performs the 180-degree image rotation and assembles the
+    # 8-dimensional state. Use theirs rather than reimplementing it, so this matches their
+    # own evaluation.
     envpre, envpost = make_env_pre_post_processors(env_cfg=LiberoEnv(), policy_cfg=cfg)
     return policy, pre, post, envpre
 
@@ -66,48 +67,55 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--sock", default="/tmp/minerva.sock")
     ap.add_argument("--ckpt", default=os.path.join(MINERVA, "ckpt/t05_l1_0.54M"),
-                    help="ローカルパスでも HF の repo id でもよい")
+                    help="a local path or a Hugging Face repo id")
     ap.add_argument("--device", default="cuda")
     ap.add_argument("--n_action_steps", type=int, default=0,
-                    help="0 なら checkpoint の既定値を使う（方策ごとに公表プロトコルが違う）")
+                    help="0 uses the checkpoint default; published protocols differ per policy")
     ap.add_argument("--temporal_ensemble_coeff", type=float, default=None,
-                    help="指定しなければ checkpoint の既定値。MINERVA の公表プロトコルは 0.01")
+                    help="defaults to the checkpoint value when unset")
     ap.add_argument("--state_dim", type=int, default=0,
-                    help="0 なら 8 次元のまま。N を指定すると先頭 N 次元に切る（検証用）")
+                    help="0 keeps all 8 dimensions; N truncates to the first N (for debugging)")
     ap.add_argument("--swap_cams", action="store_true",
-                    help="agentview と wrist の割り当てを入れ替える（検証用）")
+                    help="swap the agentview and wrist assignment (for debugging)")
     ap.add_argument("--pad_cams", action="store_true",
-                    help="3本目以降のカメラ枠にゼロ画像を送る（旧挙動・検証用）。"
-                         "既定は送らない = LeRobot 本家の評価と同じ")
+                    help="send zero images for the third and later camera slots (legacy "
+                         "behaviour, for debugging). The default omits them, which is what "
+                         "LeRobot's own evaluation does")
     a = ap.parse_args()
 
     from lerobot.envs.utils import preprocess_observation
     policy, pre, post, envpre = build(a.ckpt, a.device)
-    # 公表プロトコルは方策ごとに違うので、明示指定があるときだけ上書きする
+    # Published protocols differ per policy, so override only when explicitly asked to.
     if a.temporal_ensemble_coeff is not None:
         policy.config.temporal_ensemble_coeff = a.temporal_ensemble_coeff
     if a.n_action_steps and a.n_action_steps > 0:
         policy.config.n_action_steps = a.n_action_steps
     if hasattr(policy, "reset"): policy.reset()
-    # ---- 観測の汎用アダプタ -------------------------------------------------
-    # checkpoint が宣言する input_features に、我々の 2 カメラ + 8 次元 state を割り当てる。
-    #   画像: 名前順に並べ、1本目に agentview、2本目に wrist。**3本目以降は送らない。**
-    #         LIBERO のカメラは 2 本しかないので、余った枠は LeRobot 自身の評価と同じく
-    #         「batch に無い」状態にする。SmolVLA の prepare_images は batch に有るキーだけ
-    #         使い、無いキーは config.empty_cameras の本数まで -1 で埋める。
-    #         ★ここにゼロ画像を入れると学習時に無かった 3 本目の視覚トークン (64個) が
-    #           増えて性能が落ちる。smolvla_libero で実測 53% -> (要検証) 。
-    #           smolvla_libero は camera1/2/3 を宣言し empty_cameras=0 だが、
-    #           学習時の rename_map は image->camera1, image2->camera2 の 2 本だけで、
-    #           camera3 は一度も batch に現れていない（policy_preprocessor.json で確認）。
-    #   状態: **8 次元のまま渡す（切らない）。** config の宣言次元は信用できない。
-    #         実測（smolvla_libero）: config は shape [6] と書いているが、
-    #         学習データセット（lerobot/libero）は state 8 次元、
-    #         checkpoint の正規化統計も 8 次元、モデル本体は state_proj [960, 32] で
-    #         32 次元にパディングしている。宣言を信じて 6 次元に切ると正規化統計と
-    #         ずれて壊れる。宣言が無い方策（LingBot-VA）にだけ state を送らない。
-    # ★この割り当てが正しいかは **clean を走らせて公表値と一致するか**で検証する。
-    #   一致しなければ対応づけが間違っているので、その checkpoint は使わない。
+    # ---- generic observation adapter ---------------------------------------
+    # Map our two cameras and 8-dimensional state onto whatever input_features the checkpoint
+    # declares.
+    #
+    #   Images: sorted by name; the first slot gets agentview, the second the wrist camera, and
+    #     **the third and later slots are not sent at all**. LIBERO has only two cameras, so
+    #     the spare slots are simply absent from the batch, which is what LeRobot's own
+    #     evaluation does. SmolVLA's prepare_images uses only the keys present in the batch and
+    #     pads the rest with -1 up to config.empty_cameras.
+    #     Filling those slots with zero images instead adds 64 visual tokens that were never
+    #     present during training, and accuracy drops. One released SmolVLA checkpoint declares
+    #     camera1/2/3 with empty_cameras=0, yet its training rename_map has only
+    #     image->camera1 and image2->camera2; camera3 never appeared in a batch
+    #     (verified in policy_preprocessor.json).
+    #
+    #   State: passed through at its full 8 dimensions, never truncated. The declared shape in
+    #     the config cannot be trusted. One checkpoint declares shape [6] while its training
+    #     dataset carries an 8-dimensional state, its own normalisation statistics are
+    #     8-dimensional, and the model pads to 32 via state_proj [960, 32]. Truncating to the
+    #     declared 6 desynchronises the normalisation statistics and breaks the policy. State is
+    #     withheld only from policies that declare no state feature at all.
+    #
+    # Whether this mapping is right is settled empirically: run the nominal split and check it
+    # against the published score. If it does not match, the mapping is wrong and that
+    # checkpoint is not used.
     _feat = dict(getattr(policy.config, "input_features", {}) or {})
     _img_keys = [k.split(".")[-1] for k in _feat if ".images." in k]
     _empty = sorted(k for k in _img_keys if k.startswith("empty"))
@@ -121,15 +129,15 @@ def main():
     if a.pad_cams:
         for k in _empty: _IMG_MAP[k] = "z"
     _HAS_STATE = "observation.state" in _feat
-    print(f"  観測の割り当て: 画像 {_IMG_MAP}  state を渡す: {_HAS_STATE}（8次元のまま）", flush=True)
-    print(f"読み込み完了 ckpt={a.ckpt} params={sum(p.numel() for p in policy.parameters())/1e6:.2f}M "
+    print(f"  observation mapping: images {_IMG_MAP}  state sent: {_HAS_STATE} (all 8 dims)", flush=True)
+    print(f"loaded ckpt={a.ckpt} params={sum(p.numel() for p in policy.parameters())/1e6:.2f}M "
           f"n_action_steps={policy.config.n_action_steps} "
           f"temporal_ensemble_coeff={getattr(policy.config,'temporal_ensemble_coeff',None)}", flush=True)
 
     if os.path.exists(a.sock): os.unlink(a.sock)
     srv = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     srv.bind(a.sock); srv.listen(1)
-    print(f"待機中: {a.sock}", flush=True)
+    print(f"listening on: {a.sock}", flush=True)
     while True:
         conn, _ = srv.accept()
         conn.setsockopt(socket.IPPROTO_TCP if False else socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
@@ -144,9 +152,10 @@ def main():
                     policy.reset(); self_task = h["task"]
                     send(conn, dict(ok=True))
                 elif cmd == "act":
-                    # ★checkpoint が宣言する観測キーに機械的に割り当てる（_IMG_MAP 参照）。
-                    #   LIBERO のカメラは 2 本だけだが、checkpoint 側の枠は 2〜5 本と
-                    #   まちまちで、名前も image/image2, camera1..3, image/wrist_image と揺れる。
+                    # Assign mechanically to whatever observation keys the checkpoint
+                    # declares (see _IMG_MAP). LIBERO has two cameras; checkpoints declare
+                    # anywhere from two to five slots, named image/image2, camera1..3 or
+                    # image/wrist_image depending on the release.
                     px = {}
                     for k, src in _IMG_MAP.items():
                         px[k] = (arr["agentview"] if src == "a" else
@@ -161,8 +170,8 @@ def main():
                     o = preprocess_observation(obs)
                     o["task"] = [h["task"]]
                     o = envpre(o)
-                    # LiberoProcessorStep が作る 8 次元の state をそのまま使う。
-                    # 宣言が無い方策（LingBot-VA）にだけ送らない。
+                    # Use the 8-dimensional state LiberoProcessorStep builds, unchanged.
+                    # Withheld only from policies that declare no state feature.
                     if not _HAS_STATE:
                         o.pop("observation.state", None)
                     elif a.state_dim > 0:
@@ -184,18 +193,18 @@ def main():
                     act = post(act)
                     send(conn, dict(ok=True), dict(action=act.to("cpu").numpy().astype(np.float32)[0]))
                 else:
-                    send(conn, dict(ok=False, err=f"未知のコマンド {cmd}"))
+                    send(conn, dict(ok=False, err=f"unknown command {cmd}"))
         except Exception as e:
             traceback.print_exc()
             try: send(conn, dict(ok=False, err=traceback.format_exc()[-2000:]))
             except Exception: pass
-            # ★CUDA のエラーは sticky。一度 out of memory を踏んだプロセスは、
-            #   VRAM が空いても以後すべての確保に失敗し続ける。それでもソケットは
-            #   生きているので、そこに投げたワーカーが延々と死ぬ（2026-09-05 03:00 に
-            #   Fujiwara で 12 タスク中 8 タスクを失った）。**壊れたら即死する**のが正しい。
-            #   ソケットが消えれば run_pool.sh の回収ループがサーバを再起動する。
+            # CUDA errors are sticky: once a process has hit an out-of-memory condition,
+            # every later allocation fails even after VRAM frees up. The socket stays alive
+            # regardless, so every worker that connects to it dies in turn -- this cost 8 of
+            # 12 tasks once. Dying immediately is the correct behaviour; removing the socket
+            # lets the supervising script restart the server.
             if "CUDA error" in str(e) or "AcceleratorError" in type(e).__name__:
-                print("★CUDA コンテキストが壊れたのでサーバを終了する", flush=True)
+                print("CUDA context is broken; shutting the server down", flush=True)
                 try: conn.close()
                 except Exception: pass
                 try: os.unlink(a.sock)
