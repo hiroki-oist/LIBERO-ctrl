@@ -17,6 +17,7 @@ smoke:
 	  --suite libero_spatial --task 0 --limit 2 --out /tmp/libero_ctrl_smoke
 
 paper:
+	@mkdir -p analysis/out
 	$(PY) analysis/gen_tab_decomp.py     > analysis/out/tab_decomp.tex
 	$(PY) analysis/fig_policy_profiles.py
 	$(PY) analysis/fig_composition.py
@@ -24,6 +25,7 @@ paper:
 	@echo "-> analysis/out/"
 
 verify:
+	@mkdir -p analysis/out
 	$(PY) analysis/manuscript_numbers.py
 	$(PY) analysis/single_axis_check.py
 	$(PY) analysis/repeat_compare.py
