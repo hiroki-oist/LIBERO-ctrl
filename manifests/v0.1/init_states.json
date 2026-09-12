@@ -1,0 +1,1052 @@
+{
+ "libero_spatial": {
+  "t0": {
+   "language": "pick up the black bowl between the plate and the ramekin and place it on the plate",
+   "n_total": 50,
+   "eval_slots": [
+    43,
+    41,
+    30,
+    46,
+    49,
+    5,
+    17,
+    37,
+    15,
+    19
+   ],
+   "finetune_slots": [
+    13,
+    8,
+    21,
+    34,
+    47
+   ],
+   "grasp_targets": [
+    "akita_black_bowl_1"
+   ]
+  },
+  "t1": {
+   "language": "pick up the black bowl next to the ramekin and place it on the plate",
+   "n_total": 50,
+   "eval_slots": [
+    24,
+    8,
+    29,
+    44,
+    45,
+    11,
+    10,
+    33,
+    22,
+    41
+   ],
+   "finetune_slots": [
+    16,
+    1,
+    35,
+    9,
+    43
+   ],
+   "grasp_targets": [
+    "akita_black_bowl_1"
+   ]
+  },
+  "t2": {
+   "language": "pick up the black bowl from table center and place it on the plate",
+   "n_total": 50,
+   "eval_slots": [
+    25,
+    9,
+    39,
+    46,
+    49,
+    22,
+    29,
+    28,
+    6,
+    17
+   ],
+   "finetune_slots": [
+    23,
+    0,
+    15,
+    14,
+    44
+   ],
+   "grasp_targets": [
+    "akita_black_bowl_1"
+   ]
+  },
+  "t3": {
+   "language": "pick up the black bowl on the cookie box and place it on the plate",
+   "n_total": 50,
+   "eval_slots": [
+    23,
+    18,
+    35,
+    20,
+    30,
+    43,
+    21,
+    34,
+    13,
+    24
+   ],
+   "finetune_slots": [
+    11,
+    0,
+    47,
+    3,
+    15
+   ],
+   "grasp_targets": [
+    "akita_black_bowl_1"
+   ]
+  },
+  "t4": {
+   "language": "pick up the black bowl in the top drawer of the wooden cabinet and place it on the plate",
+   "n_total": 50,
+   "eval_slots": [
+    41,
+    44,
+    7,
+    0,
+    32,
+    14,
+    49,
+    19,
+    27,
+    47
+   ],
+   "finetune_slots": [
+    26,
+    11,
+    40,
+    48,
+    37
+   ],
+   "grasp_targets": [
+    "akita_black_bowl_1"
+   ]
+  },
+  "t5": {
+   "language": "pick up the black bowl on the ramekin and place it on the plate",
+   "n_total": 50,
+   "eval_slots": [
+    7,
+    29,
+    21,
+    37,
+    23,
+    30,
+    49,
+    0,
+    17,
+    25
+   ],
+   "finetune_slots": [
+    9,
+    26,
+    12,
+    10,
+    22
+   ],
+   "grasp_targets": [
+    "akita_black_bowl_1"
+   ]
+  },
+  "t6": {
+   "language": "pick up the black bowl next to the cookie box and place it on the plate",
+   "n_total": 50,
+   "eval_slots": [
+    10,
+    16,
+    13,
+    17,
+    36,
+    46,
+    30,
+    41,
+    34,
+    28
+   ],
+   "finetune_slots": [
+    32,
+    2,
+    15,
+    38,
+    44
+   ],
+   "grasp_targets": [
+    "akita_black_bowl_1"
+   ]
+  },
+  "t7": {
+   "language": "pick up the black bowl on the stove and place it on the plate",
+   "n_total": 50,
+   "eval_slots": [
+    16,
+    1,
+    34,
+    4,
+    24,
+    30,
+    18,
+    12,
+    9,
+    8
+   ],
+   "finetune_slots": [
+    35,
+    32,
+    19,
+    29,
+    39
+   ],
+   "grasp_targets": [
+    "akita_black_bowl_1"
+   ]
+  },
+  "t8": {
+   "language": "pick up the black bowl next to the plate and place it on the plate",
+   "n_total": 50,
+   "eval_slots": [
+    33,
+    23,
+    29,
+    3,
+    35,
+    49,
+    7,
+    13,
+    45,
+    26
+   ],
+   "finetune_slots": [
+    5,
+    47,
+    10,
+    48,
+    31
+   ],
+   "grasp_targets": [
+    "akita_black_bowl_1"
+   ]
+  },
+  "t9": {
+   "language": "pick up the black bowl on the wooden cabinet and place it on the plate",
+   "n_total": 50,
+   "eval_slots": [
+    14,
+    9,
+    12,
+    47,
+    4,
+    31,
+    45,
+    16,
+    18,
+    23
+   ],
+   "finetune_slots": [
+    11,
+    37,
+    6,
+    48,
+    21
+   ],
+   "grasp_targets": [
+    "akita_black_bowl_1"
+   ]
+  }
+ },
+ "libero_object": {
+  "t0": {
+   "language": "pick up the alphabet soup and place it in the basket",
+   "n_total": 50,
+   "eval_slots": [
+    16,
+    2,
+    22,
+    26,
+    6,
+    12,
+    15,
+    7,
+    20,
+    19
+   ],
+   "finetune_slots": [
+    23,
+    30,
+    42,
+    25,
+    8
+   ],
+   "grasp_targets": [
+    "alphabet_soup_1"
+   ]
+  },
+  "t1": {
+   "language": "pick up the cream cheese and place it in the basket",
+   "n_total": 50,
+   "eval_slots": [
+    0,
+    29,
+    19,
+    45,
+    31,
+    40,
+    30,
+    11,
+    5,
+    38
+   ],
+   "finetune_slots": [
+    44,
+    47,
+    41,
+    23,
+    28
+   ],
+   "grasp_targets": [
+    "cream_cheese_1"
+   ]
+  },
+  "t2": {
+   "language": "pick up the salad dressing and place it in the basket",
+   "n_total": 50,
+   "eval_slots": [
+    23,
+    29,
+    26,
+    40,
+    49,
+    3,
+    41,
+    44,
+    19,
+    9
+   ],
+   "finetune_slots": [
+    25,
+    24,
+    13,
+    17,
+    12
+   ],
+   "grasp_targets": [
+    "salad_dressing_1"
+   ]
+  },
+  "t3": {
+   "language": "pick up the bbq sauce and place it in the basket",
+   "n_total": 50,
+   "eval_slots": [
+    37,
+    30,
+    11,
+    5,
+    6,
+    40,
+    42,
+    32,
+    14,
+    0
+   ],
+   "finetune_slots": [
+    3,
+    47,
+    25,
+    13,
+    1
+   ],
+   "grasp_targets": [
+    "bbq_sauce_1"
+   ]
+  },
+  "t4": {
+   "language": "pick up the ketchup and place it in the basket",
+   "n_total": 50,
+   "eval_slots": [
+    37,
+    8,
+    2,
+    14,
+    31,
+    36,
+    10,
+    21,
+    12,
+    45
+   ],
+   "finetune_slots": [
+    3,
+    19,
+    24,
+    7,
+    22
+   ],
+   "grasp_targets": [
+    "ketchup_1"
+   ]
+  },
+  "t5": {
+   "language": "pick up the tomato sauce and place it in the basket",
+   "n_total": 50,
+   "eval_slots": [
+    48,
+    39,
+    3,
+    21,
+    34,
+    32,
+    12,
+    29,
+    33,
+    42
+   ],
+   "finetune_slots": [
+    16,
+    9,
+    8,
+    45,
+    31
+   ],
+   "grasp_targets": [
+    "tomato_sauce_1"
+   ]
+  },
+  "t6": {
+   "language": "pick up the butter and place it in the basket",
+   "n_total": 50,
+   "eval_slots": [
+    8,
+    38,
+    43,
+    9,
+    18,
+    12,
+    42,
+    37,
+    19,
+    13
+   ],
+   "finetune_slots": [
+    45,
+    35,
+    28,
+    22,
+    29
+   ],
+   "grasp_targets": [
+    "butter_1"
+   ]
+  },
+  "t7": {
+   "language": "pick up the milk and place it in the basket",
+   "n_total": 50,
+   "eval_slots": [
+    2,
+    25,
+    14,
+    11,
+    42,
+    29,
+    10,
+    22,
+    17,
+    45
+   ],
+   "finetune_slots": [
+    33,
+    41,
+    47,
+    32,
+    40
+   ],
+   "grasp_targets": [
+    "milk_1"
+   ]
+  },
+  "t8": {
+   "language": "pick up the chocolate pudding and place it in the basket",
+   "n_total": 50,
+   "eval_slots": [
+    25,
+    39,
+    30,
+    10,
+    48,
+    18,
+    41,
+    32,
+    24,
+    37
+   ],
+   "finetune_slots": [
+    36,
+    21,
+    0,
+    14,
+    16
+   ],
+   "grasp_targets": [
+    "chocolate_pudding_1"
+   ]
+  },
+  "t9": {
+   "language": "pick up the orange juice and place it in the basket",
+   "n_total": 50,
+   "eval_slots": [
+    8,
+    28,
+    12,
+    49,
+    35,
+    19,
+    33,
+    26,
+    43,
+    39
+   ],
+   "finetune_slots": [
+    24,
+    41,
+    10,
+    40,
+    17
+   ],
+   "grasp_targets": [
+    "orange_juice_1"
+   ]
+  }
+ },
+ "libero_goal": {
+  "t0": {
+   "language": "open the middle drawer of the cabinet",
+   "n_total": 50,
+   "eval_slots": [
+    2,
+    6,
+    29,
+    37,
+    18,
+    0,
+    22,
+    12,
+    26,
+    33
+   ],
+   "finetune_slots": [
+    49,
+    38,
+    23,
+    21,
+    24
+   ],
+   "grasp_targets": []
+  },
+  "t1": {
+   "language": "put the bowl on the stove",
+   "n_total": 50,
+   "eval_slots": [
+    38,
+    7,
+    45,
+    18,
+    17,
+    31,
+    29,
+    4,
+    11,
+    3
+   ],
+   "finetune_slots": [
+    40,
+    48,
+    21,
+    19,
+    34
+   ],
+   "grasp_targets": [
+    "akita_black_bowl_1"
+   ]
+  },
+  "t2": {
+   "language": "put the wine bottle on top of the cabinet",
+   "n_total": 50,
+   "eval_slots": [
+    38,
+    47,
+    31,
+    0,
+    46,
+    15,
+    42,
+    30,
+    17,
+    19
+   ],
+   "finetune_slots": [
+    9,
+    35,
+    7,
+    12,
+    39
+   ],
+   "grasp_targets": [
+    "wine_bottle_1"
+   ]
+  },
+  "t3": {
+   "language": "open the top drawer and put the bowl inside",
+   "n_total": 50,
+   "eval_slots": [
+    17,
+    48,
+    23,
+    49,
+    2,
+    37,
+    10,
+    31,
+    43,
+    19
+   ],
+   "finetune_slots": [
+    18,
+    1,
+    22,
+    20,
+    35
+   ],
+   "grasp_targets": [
+    "akita_black_bowl_1"
+   ]
+  },
+  "t4": {
+   "language": "put the bowl on top of the cabinet",
+   "n_total": 50,
+   "eval_slots": [
+    47,
+    1,
+    14,
+    9,
+    44,
+    2,
+    8,
+    0,
+    24,
+    35
+   ],
+   "finetune_slots": [
+    49,
+    21,
+    17,
+    33,
+    43
+   ],
+   "grasp_targets": [
+    "akita_black_bowl_1"
+   ]
+  },
+  "t5": {
+   "language": "push the plate to the front of the stove",
+   "n_total": 50,
+   "eval_slots": [
+    25,
+    27,
+    3,
+    8,
+    7,
+    34,
+    12,
+    44,
+    17,
+    33
+   ],
+   "finetune_slots": [
+    40,
+    18,
+    11,
+    48,
+    31
+   ],
+   "grasp_targets": [
+    "plate_1"
+   ]
+  },
+  "t6": {
+   "language": "put the cream cheese in the bowl",
+   "n_total": 50,
+   "eval_slots": [
+    45,
+    7,
+    49,
+    34,
+    40,
+    27,
+    48,
+    41,
+    32,
+    39
+   ],
+   "finetune_slots": [
+    47,
+    24,
+    38,
+    6,
+    22
+   ],
+   "grasp_targets": [
+    "cream_cheese_1"
+   ]
+  },
+  "t7": {
+   "language": "turn on the stove",
+   "n_total": 50,
+   "eval_slots": [
+    47,
+    46,
+    5,
+    41,
+    8,
+    26,
+    19,
+    25,
+    42,
+    16
+   ],
+   "finetune_slots": [
+    13,
+    40,
+    33,
+    23,
+    10
+   ],
+   "grasp_targets": []
+  },
+  "t8": {
+   "language": "put the bowl on the plate",
+   "n_total": 50,
+   "eval_slots": [
+    42,
+    11,
+    17,
+    0,
+    14,
+    31,
+    40,
+    45,
+    41,
+    28
+   ],
+   "finetune_slots": [
+    27,
+    33,
+    43,
+    34,
+    4
+   ],
+   "grasp_targets": [
+    "akita_black_bowl_1"
+   ]
+  },
+  "t9": {
+   "language": "put the wine bottle on the rack",
+   "n_total": 50,
+   "eval_slots": [
+    44,
+    2,
+    25,
+    30,
+    41,
+    27,
+    18,
+    4,
+    49,
+    33
+   ],
+   "finetune_slots": [
+    31,
+    35,
+    19,
+    42,
+    13
+   ],
+   "grasp_targets": [
+    "wine_bottle_1"
+   ]
+  }
+ },
+ "libero_10": {
+  "t0": {
+   "language": "put both the alphabet soup and the tomato sauce in the basket",
+   "n_total": 50,
+   "eval_slots": [
+    15,
+    11,
+    27,
+    19,
+    40,
+    37,
+    16,
+    17,
+    6,
+    49
+   ],
+   "finetune_slots": [
+    39,
+    13,
+    21,
+    31,
+    20
+   ],
+   "grasp_targets": [
+    "alphabet_soup_1",
+    "tomato_sauce_1"
+   ]
+  },
+  "t1": {
+   "language": "put both the cream cheese box and the butter in the basket",
+   "n_total": 50,
+   "eval_slots": [
+    11,
+    6,
+    29,
+    23,
+    7,
+    14,
+    44,
+    36,
+    5,
+    39
+   ],
+   "finetune_slots": [
+    0,
+    12,
+    3,
+    31,
+    40
+   ],
+   "grasp_targets": [
+    "cream_cheese_1",
+    "butter_1"
+   ]
+  },
+  "t2": {
+   "language": "turn on the stove and put the moka pot on it",
+   "n_total": 50,
+   "eval_slots": [
+    30,
+    5,
+    7,
+    33,
+    10,
+    32,
+    2,
+    31,
+    9,
+    26
+   ],
+   "finetune_slots": [
+    49,
+    36,
+    27,
+    47,
+    34
+   ],
+   "grasp_targets": [
+    "moka_pot_1"
+   ]
+  },
+  "t3": {
+   "language": "put the black bowl in the bottom drawer of the cabinet and close it",
+   "n_total": 50,
+   "eval_slots": [
+    4,
+    22,
+    28,
+    13,
+    32,
+    25,
+    42,
+    6,
+    15,
+    48
+   ],
+   "finetune_slots": [
+    19,
+    3,
+    38,
+    49,
+    27
+   ],
+   "grasp_targets": [
+    "akita_black_bowl_1"
+   ]
+  },
+  "t4": {
+   "language": "put the white mug on the left plate and put the yellow and white mug on the right plate",
+   "n_total": 50,
+   "eval_slots": [
+    22,
+    9,
+    49,
+    3,
+    48,
+    27,
+    34,
+    29,
+    40,
+    19
+   ],
+   "finetune_slots": [
+    26,
+    37,
+    45,
+    35,
+    47
+   ],
+   "grasp_targets": [
+    "porcelain_mug_1",
+    "white_yellow_mug_1"
+   ]
+  },
+  "t5": {
+   "language": "pick up the book and place it in the back compartment of the caddy",
+   "n_total": 50,
+   "eval_slots": [
+    26,
+    35,
+    7,
+    30,
+    22,
+    36,
+    0,
+    45,
+    25,
+    42
+   ],
+   "finetune_slots": [
+    18,
+    19,
+    47,
+    31,
+    37
+   ],
+   "grasp_targets": [
+    "black_book_1"
+   ]
+  },
+  "t6": {
+   "language": "put the white mug on the plate and put the chocolate pudding to the right of the plate",
+   "n_total": 50,
+   "eval_slots": [
+    31,
+    48,
+    3,
+    42,
+    38,
+    13,
+    43,
+    27,
+    40,
+    4
+   ],
+   "finetune_slots": [
+    49,
+    45,
+    8,
+    2,
+    18
+   ],
+   "grasp_targets": [
+    "porcelain_mug_1",
+    "chocolate_pudding_1"
+   ]
+  },
+  "t7": {
+   "language": "put both the alphabet soup and the cream cheese box in the basket",
+   "n_total": 50,
+   "eval_slots": [
+    49,
+    34,
+    35,
+    18,
+    47,
+    32,
+    0,
+    29,
+    11,
+    26
+   ],
+   "finetune_slots": [
+    12,
+    2,
+    24,
+    30,
+    3
+   ],
+   "grasp_targets": [
+    "alphabet_soup_1",
+    "cream_cheese_1"
+   ]
+  },
+  "t8": {
+   "language": "put both moka pots on the stove",
+   "n_total": 50,
+   "eval_slots": [
+    2,
+    12,
+    10,
+    4,
+    17,
+    9,
+    16,
+    36,
+    47,
+    43
+   ],
+   "finetune_slots": [
+    11,
+    39,
+    34,
+    19,
+    22
+   ],
+   "grasp_targets": [
+    "moka_pot_1",
+    "moka_pot_2"
+   ]
+  },
+  "t9": {
+   "language": "put the yellow and white mug in the microwave and close it",
+   "n_total": 50,
+   "eval_slots": [
+    21,
+    20,
+    39,
+    18,
+    31,
+    17,
+    44,
+    35,
+    49,
+    14
+   ],
+   "finetune_slots": [
+    40,
+    16,
+    7,
+    5,
+    22
+   ],
+   "grasp_targets": [
+    "white_yellow_mug_1"
+   ]
+  }
+ }
+}

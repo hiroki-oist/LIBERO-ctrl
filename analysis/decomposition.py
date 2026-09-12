@@ -1,0 +1,90 @@
+"""同時条件のズレを「脆弱性の依存性」と「重畳効果」に厳密に分解する。
+
+  S_indep = Π_a P(生存_a)      6軸の生存指標が独立なときの P(全生存)
+  S_conj  = 観測した P(全生存)  単軸データのみから決まる
+  S_sim   = 同時条件の成功率    ここで初めて同時データが入る
+
+  S_sim − S_indep = (S_conj − S_indep) + (S_sim − S_conj)
+                    ~~~~~~~~~~~~~~~~~    ~~~~~~~~~~~~~~~
+                    依存性（interaction ではない）  重畳効果（唯一の interaction）
+
+★論文の積モデル S_prod = clean × Π(SR_a/clean) は clean で条件付けているぶん
+  S_indep より系統的に高く、差を「依存性」と呼ぶと符号が反転する。基準は S_indep を使う。
+★clean 成功軌道に限定すると clean=100% なので S_indep と S_prod が一致し、基準の恣意性が消える。
+"""
+
+import os as _os
+# ★結果は results/paper/<run名>/rollouts.jsonl に統合済み（fuji と taketomi の両方を、
+#   taketomi 優先でマージ）。旧リポジトリの /tmp/tkpull による上書きはもう不要。
+ROOT = _os.environ.get("LIBERO_CTRL_ROOT",
+       _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))
+RESULTS = _os.path.join(ROOT, "results", "paper")
+MANIFESTS = _os.path.join(ROOT, "manifests", "v0.1")
+OUT_DIR = _os.path.join(ROOT, "analysis", "out")
+_os.makedirs(OUT_DIR, exist_ok=True)
+
+import json, glob, collections, random, sys
+from math import comb
+
+AX = ("camera","lighting","robot","sensor","actuation","language")
+LV = ("L1","L2","L3")
+tk = collections.defaultdict(list)
+# 統合済みなので追加の読み込み元は無い
+def load(ds):
+    o = {}
+    for d in ds:
+        for f in glob.glob(f"{RESULTS}/{d}/*.jsonl"):
+            for l in open(f): r = json.loads(l); o[r["rollout_id"]] = r
+        for r in tk.get(d, []): o[r["rollout_id"]] = r
+    return list(o.values())
+PV = lambda s: ([f"predvla_s{s}_eval"]+[f"predvla_s{s}_sh{i}_eval" for i in range(4)],
+                [f"predvla_s{s}_clean"]+[f"predvla_s{s}_sh{i}_clean" for i in range(2)])
+POL = [("MINERVA",["minerva_eval","minerva_comb"],["minerva_clean"]),("PredVLA",*PV(13)),
+       ("SmolVLA",["smolvla_eval"],["smolvla_clean"]),("VLA-JEPA",["vlajepa_eval"],["vlajepa_clean"]),
+       ("pi0.5",["pi05_eval"],["pi05_clean"]),("OpenVLA-OFT",["oft_eval"],["oft_clean"]),
+       ("UniVLA",["univla_eval"],["univla_clean"])]
+
+def analyse(name, ed, cd, clean_only):
+    ev, cl = load(ed), load(cd)
+    ok = {(r["suite"], r["task_id"], r["init_id"]): r["success"] for r in cl if r["axis"]=="clean"}
+    unit = collections.defaultdict(dict); init = {}
+    for r in ev:
+        k = (r["suite"], r["task_id"], r["level"], r["config"])
+        unit[k][r["axis"]] = r["success"]; init[k] = (r["suite"], r["task_id"], r["init_id"])
+    out = {}
+    for L in LV:
+        ks = [k for k in unit if k[2]==L and all(a in unit[k] for a in AX) and "combination" in unit[k]]
+        if clean_only:
+            ks = [k for k in ks if ok.get(init[k], False)]
+        if len(ks) < 60: continue
+        N = len(ks)
+        ind = 1.0
+        for a in AX: ind *= sum(unit[k][a] for k in ks)/N
+        a1 = [k for k in ks if all(unit[k][a] for a in AX)]
+        b = sum(1 for k in a1 if not unit[k]["combination"])
+        c = sum(1 for k in ks if k not in set(a1) and unit[k]["combination"])
+        Sc = 100*len(a1)/N; Ss = 100*sum(unit[k]["combination"] for k in ks)/N
+        nf = N - sum(unit[k]["combination"] for k in ks)
+        # K = 単独で耐えた軸数
+        KH = collections.defaultdict(lambda: [0,0])
+        for k in ks:
+            K = sum(unit[k][a] for a in AX)
+            KH[K][0] += unit[k]["combination"]; KH[K][1] += 1
+        out[L] = dict(N=N, indep=100*ind, conj=Sc, sim=Ss, dep=Sc-100*ind, I=Ss-Sc, b=b, c=c,
+                      Fh=100*b/nf if nf else float("nan"),
+                      pmc=min(1.0, 2*sum(comb(b+c,i) for i in range(min(b,c)+1))/2**(b+c)) if b+c else 1.0,
+                      K={k_: (100*v[0]/v[1], v[1]) for k_, v in KH.items()})
+    return out
+
+for tag, co in (("全軌道", False), ("clean 成功軌道のみ", True)):
+    print(f"\n{'='*94}\n=== {tag} ===")
+    print(f"{'方策':12s}{'L':3s}{'N':>5s}{'S_indep':>8s}{'S_conj':>7s}{'S_sim':>7s} | "
+          f"{'依存性':>7s}{'重畳I':>7s}{'McN':>7s} | {'F_hidden':>9s}")
+    print("-"*94)
+    for name, ed, cd in POL:
+        r = analyse(name, ed, cd, co)
+        for L in LV:
+            if L not in r: continue
+            d = r[L]
+            print(f"{name if L=='L1' else '':12s}{L:3s}{d['N']:5d}{d['indep']:8.1f}{d['conj']:7.1f}"
+                  f"{d['sim']:7.1f} | {d['dep']:+7.1f}{d['I']:+7.1f}{d['pmc']:7.3f} | {d['Fh']:8.1f}%")

@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "libero-ctrl"
+version = "0.1.0"
+description = "LIBERO-CTRL: a severity-calibrated, paired, controlled robustness benchmark for VLA policies"
+readme = "README.md"
+requires-python = ">=3.9"
+# ★LIBERO 本体（robosuite 1.4.0 / MuJoCo 2.3.7）は**あえて依存に書かない**。
+#   利用者は既に動く LIBERO 環境を持っている前提で、その環境に本パッケージを入れる。
+#   ここで robosuite を引くと、既存の評価環境のバージョンを壊す。
+dependencies = ["numpy", "scipy", "pillow"]
+
+[project.scripts]
+libero-ctrl = "libero_ctrl.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["libero_ctrl*"]
+
+[tool.setuptools.package-data]
+libero_ctrl = ["py.typed"]

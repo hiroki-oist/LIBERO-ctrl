@@ -1,0 +1,1 @@
+{"rollout_id": "spatial/t0/clean/i00", "success": false, "steps": 220, "axis": "clean", "level": "L0", "suite": "libero_spatial", "task_id": 0, "init_id": 0, "config": null, "policy": "oft", "wall_s": 111.78}

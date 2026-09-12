@@ -1,0 +1,5 @@
+{"rollout_id": "spatial/t2/clean/i00", "success": false, "steps": 220, "axis": "clean", "level": "L0", "suite": "libero_spatial", "task_id": 2, "init_id": 0, "config": null, "policy": "oft", "wall_s": 31.04}
+{"rollout_id": "spatial/t2/clean/i01", "success": false, "steps": 220, "axis": "clean", "level": "L0", "suite": "libero_spatial", "task_id": 2, "init_id": 1, "config": null, "policy": "oft", "wall_s": 30.25}
+{"rollout_id": "spatial/t2/clean/i02", "success": false, "steps": 220, "axis": "clean", "level": "L0", "suite": "libero_spatial", "task_id": 2, "init_id": 2, "config": null, "policy": "oft", "wall_s": 29.81}
+{"rollout_id": "spatial/t2/clean/i03", "success": false, "steps": 220, "axis": "clean", "level": "L0", "suite": "libero_spatial", "task_id": 2, "init_id": 3, "config": null, "policy": "oft", "wall_s": 29.71}
+{"rollout_id": "spatial/t2/clean/i04", "success": false, "steps": 220, "axis": "clean", "level": "L0", "suite": "libero_spatial", "task_id": 2, "init_id": 4, "config": null, "policy": "oft", "wall_s": 29.92}

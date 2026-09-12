@@ -1,0 +1,96 @@
+#!/usr/bin/env python3
+"""tab:decomp を厳密に生成する。
+
+★I は 100*(c-b)/N の整数比で出す。100*(S_sim - S_conj) と書くと
+  0.2875-0.15 = 0.13749999999999998 のような誤差で 0.1 ずれる（実際ずれていた）。
+"""
+
+import os as _os
+# ★結果は results/paper/<run名>/rollouts.jsonl に統合済み（fuji と taketomi の両方を、
+#   taketomi 優先でマージ）。旧リポジトリの /tmp/tkpull による上書きはもう不要。
+ROOT = _os.environ.get("LIBERO_CTRL_ROOT",
+       _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))
+RESULTS = _os.path.join(ROOT, "results", "paper")
+MANIFESTS = _os.path.join(ROOT, "manifests", "v0.1")
+OUT_DIR = _os.path.join(ROOT, "analysis", "out")
+_os.makedirs(OUT_DIR, exist_ok=True)
+
+import json, glob, collections
+import numpy as np
+AX=("camera","lighting","robot","sensor","actuation","language")
+POL=[("MINERVA$^{\\ast}$",["minerva_eval"],["minerva_clean"]),
+     ("PredVLA",["predvla_s13_eval"],["predvla_s13_clean"]),
+     ("SmolVLA",["smolvla_eval"],["smolvla_clean"]),
+     ("VLA-JEPA",["vlajepa_eval"],["vlajepa_clean"]),
+     ("$\\pi_{0.5}$",["pi05_eval"],["pi05_clean"]),
+     ("OpenVLA-OFT",["oft_eval"],["oft_clean"]),
+     ("UniVLA",["univla_eval"],["univla_clean"])]
+def load(ds):
+    o={}
+    for d in ds:
+        for f in glob.glob(f"{RESULTS}/{d}/*.jsonl"):
+            for l in open(f): r=json.loads(l); o[r["rollout_id"]]=r
+    return o
+def counts(u, ks):
+    N=len(ks); a1=[k for k in ks if all(u[k][a] for a in AX)]
+    s=set(a1)
+    b=sum(1 for k in a1 if not u[k]["combination"])
+    c=sum(1 for k in ks if k not in s and u[k]["combination"])
+    nsim=sum(u[k]["combination"] for k in ks)
+    Sa={a: sum(u[k][a] for k in ks)/N for a in AX}
+    return N,b,c,len(a1),nsim,Sa
+rows=[]
+for name,ed,cd in POL:
+    ev=load(ed); cl=load(cd)
+    S0=sum(r["success"] for r in cl.values())/len(cl)
+    u=collections.defaultdict(dict)
+    for r in ev.values(): u[(r["suite"],r["task_id"],r["level"],r["config"])][r["axis"]]=r["success"]
+    for L in ("L1","L2","L3"):
+        ks=[k for k in u if k[2]==L and len(u[k])==7]
+        N,b,c,na1,nsim,Sa=counts(u,ks)
+        Sp=S0*np.prod([Sa[a]/S0 for a in AX]); Si=float(np.prod([Sa[a] for a in AX]))
+        Sc=na1/N; Ss=nsim/N
+        I=100*(c-b)/N                      # ★整数比で厳密に
+        B=100*(Si-Sp); D=100*(Sc-Si); res=100*(Ss-Sp)
+        bycell=collections.defaultdict(list)
+        for k in ks: bycell[(k[0],k[1])].append(k)
+        cells=sorted(bycell); rng=np.random.default_rng(0)
+        bs=[]
+        for _ in range(4000):
+            kk=[k for cc in [cells[i] for i in rng.integers(0,len(cells),len(cells))] for k in bycell[cc]]
+            n2,b2,c2,_,_,_=counts(u,kk); bs.append(100*(c2-b2)/n2)
+        lo,hi=np.percentile(bs,[2.5,97.5])
+        p=2*min((np.array(bs)>0).mean(),(np.array(bs)<0).mean())
+        if lo==hi==0.0: p=1.0          # 全リサンプルが厳密に 0 の退化ケース
+        rows.append(dict(pol=name,L=L,res=res,B=B,D=D,I=I,lo=lo,hi=hi,p=p,Sp=100*Sp,N=N,b=b,c=c))
+DAG={("SmolVLA","L2"),("$\\pi_{0.5}$","L2")}   # 独立再取得で有意性が持ち越されなかったセル
+def f(x,d=1): return f"${x:+.{d}f}$"
+print("\\begin{table*}[t]")
+print("\\centering")
+print("\\caption{Decomposition of the rate-level residual, $S_{\\mathrm{sim}}-S_{\\mathrm{prod}}=B+D+I$,")
+print("in percentage points. Bold marks an interval on $I$ excluding zero. Cells whose")
+print("$S_{\\mathrm{prod}}$ falls below $4\\%$ are shaded: the decomposition is still exact there, but")
+print("every term is compressed against the floor and the estimate carries little information")
+print("(Section~\\ref{sec:method:floor}). $^{\\ddagger}$Original significance did not carry over to the")
+print("independent replication (Section~\\ref{sec:res:noise}).}")
+print("\\label{tab:decomp}")
+print("\\small")
+print("\\begin{tabular}{llrrrrlr}")
+print("\\toprule")
+print("Policy & L & Residual & $B$ & $D$ & $I$ & $95\\%$ CI on $I$ & $S_{\\mathrm{prod}}$ \\\\")
+print("\\midrule")
+prev=None
+for r in rows:
+    if prev is not None and r["pol"]!=prev: print("\\midrule")
+    head=f"\\multirow{{3}}{{*}}{{{r['pol']}}}\n" if r["pol"]!=prev else ""
+    prev=r["pol"]
+    Itxt=f"{r['I']:+.1f}"
+    if r["lo"]>0 or r["hi"]<0: Itxt=f"\\mathbf{{{Itxt}}}"
+    Itxt=f"${Itxt}$"
+    if (r["pol"],r["L"]) in DAG: Itxt+="$^{\\ddagger}$"
+    ci=f"$[{r['lo']:+.1f},{r['hi']:+.1f}]$"
+    shade="\\rowcolor{black!7} " if r["Sp"]<4 else ""
+    print(f"{head}{shade} & {r['L']} & {f(r['res'])} & {f(r['B'])} & {f(r['D'])} & {Itxt} & {ci} & ${r['Sp']:.1f}$ \\\\")
+print("\\bottomrule")
+print("\\end{tabular}")
+print("\\end{table*}")
