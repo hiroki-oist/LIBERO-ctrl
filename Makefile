@@ -28,6 +28,7 @@ paper:
 verify:
 	@mkdir -p analysis/out
 	$(PY) analysis/manuscript_numbers.py
+	$(PY) analysis/emergent_compensated.py
 	$(PY) analysis/single_axis_check.py
 	$(PY) analysis/repeat_compare.py
 	$(PY) analysis/full_independent.py
