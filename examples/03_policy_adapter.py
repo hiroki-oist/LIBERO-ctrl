@@ -24,8 +24,8 @@ class MyPolicy:
         """Called at the start of each rollout. `language` is the perturbed instruction.
 
         The seed is derived deterministically from the rollout id. Seeding the policy's own
-        randomness here makes the rollout exactly reproducible; not doing so makes the policy
-        stochastic, as three of the seven policies in the paper turned out to be.
+        randomness here makes the rollout reproducible; leaving it unseeded makes the policy
+        stochastic, which is measured and reported rather than treated as an error.
         """
         self.language = language
         self.rng = np.random.default_rng(seed)

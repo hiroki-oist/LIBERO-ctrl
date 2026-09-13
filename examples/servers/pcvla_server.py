@@ -26,12 +26,11 @@ vector from its training cache, keyed by task number, so a substituted instructi
 reach the policy. Measuring the language axis requires re-encoding with the same sentence
 encoder used during training, which is what `Frontend.lang(text)` does.
 
-torch.compile must be enabled. The reference `eval_single.py --compile` wraps `ERBatch._roll`
+torch.compile must be enabled, as the reference implementation does by wrapping `ERBatch._roll`
 in `torch.compile(..., dynamic=False)`. One control step runs 10 iterations over a 40-step
-window -- 400 RNN forward and backward passes in a Python loop -- so compilation changes the
-throughput by an order of magnitude: measured 402.5 ms/step without it against 114.7 ms with
-it, on one CPU thread. The policy's published 21.6 Hz is the compiled figure. Sharing
-`TORCHINDUCTOR_CACHE_DIR` lets the second and later servers reuse the compiled artefacts.
+window -- 400 RNN forward and backward passes in a Python loop -- and compilation changes the
+throughput by roughly a factor of three. The policy's published control rate is the compiled
+figure. Sharing `TORCHINDUCTOR_CACHE_DIR` lets later servers reuse the compiled artefacts.
 
   start:  <policy venv>/bin/python examples/servers/pcvla_server.py \
             --sock /tmp/pcv_0.sock --ckpt <.../step_30000.pt>

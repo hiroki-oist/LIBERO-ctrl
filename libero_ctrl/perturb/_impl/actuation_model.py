@@ -28,10 +28,8 @@ KEYS = ["gain_log2", "bias_frac", "misalign_deg", "lag_tau", "noise_frac"]
 # so L1 = 10 mm (a good low-cost arm, or an ordinary research one), L2 = 20 mm (worst case for
 # research-grade, typical for SO-101), L3 = 40 mm (SO-101 under load, poorly calibrated).
 #
-# What r = 8 along a single parameter actually amounts to -- all of it plausible on a low-cost
-# arm: gain x1.082, bias 5.95%, misalignment 7.17 deg, lag 2.60 steps (130 ms), noise sigma
-# 18.8%. Deliberately not stronger than that: values no real arm exhibits (gain x2, say) would
-# cost the axis its credibility.
+# What r = 8 along a single parameter amounts to, all of it plausible on a low-cost arm:
+# gain x1.082, bias 5.95%, misalignment 7.17 deg, lag 2.60 steps (130 ms), noise sigma 18.8%.
 UNIT = np.array([0.01432, 0.00744, 0.89606, 0.32468, 0.02350])
 # lag and noise depend only on magnitude, so they are sampled from a half-space
 HALF_SPACE = [3, 4]

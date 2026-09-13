@@ -226,10 +226,8 @@ def main():
                         lat, vis, gen = vla.predict_latent_action(
                             **inputs, unnorm_key=key, do_sample=True, temperature=0.75, top_p=0.9)
                         # With do_sample=True, tokens outside the latent action vocabulary
-                        # 32001..32032 (EOS, for instance) sometimes appear. Indexing with
-                        # them raises IndexError, the server returns an exception and the
-                        # worker dies -- this once wiped out four whole tasks. Negative values
-                        # silently index from the other end, so the range is checked
+                        # 32001..32032 (EOS, for instance) can appear. Negative indices would
+                        # silently address the other end of the table, so the range is checked
                         # explicitly and out-of-range tokens are dropped from the history.
                         hist.append("".join(DETOK[int(i) - 32001] for i in gen[0]
                                             if 32001 <= int(i) <= 32032))

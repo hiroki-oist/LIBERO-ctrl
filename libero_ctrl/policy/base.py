@@ -18,11 +18,3 @@ class Policy(Protocol):
         """Return a (7,) action."""
 
 
-class ScriptedNoop:
-    """A do-nothing policy for wiring checks; it only opens the gripper."""
-    name = "noop"
-
-    def reset(self, language: str, *, seed: int) -> None: self.lang = language
-
-    def act(self, agentview, wrist, obs):
-        a = np.zeros(7); a[-1] = -1.0; return a

@@ -74,13 +74,12 @@ def main():
     ap.add_argument("--temporal_ensemble_coeff", type=float, default=None,
                     help="defaults to the checkpoint value when unset")
     ap.add_argument("--state_dim", type=int, default=0,
-                    help="0 keeps all 8 dimensions; N truncates to the first N (for debugging)")
+                    help="0 keeps all 8 dimensions; N truncates to the first N")
     ap.add_argument("--swap_cams", action="store_true",
-                    help="swap the agentview and wrist assignment (for debugging)")
+                    help="swap the agentview and wrist assignment")
     ap.add_argument("--pad_cams", action="store_true",
-                    help="send zero images for the third and later camera slots (legacy "
-                         "behaviour, for debugging). The default omits them, which is what "
-                         "LeRobot's own evaluation does")
+                    help="send zero images for the third and later camera slots. The default "
+                         "omits them, which is what LeRobot's own evaluation does")
     a = ap.parse_args()
 
     from lerobot.envs.utils import preprocess_observation
@@ -100,18 +99,15 @@ def main():
     #     the spare slots are simply absent from the batch, which is what LeRobot's own
     #     evaluation does. SmolVLA's prepare_images uses only the keys present in the batch and
     #     pads the rest with -1 up to config.empty_cameras.
-    #     Filling those slots with zero images instead adds 64 visual tokens that were never
-    #     present during training, and accuracy drops. One released SmolVLA checkpoint declares
-    #     camera1/2/3 with empty_cameras=0, yet its training rename_map has only
-    #     image->camera1 and image2->camera2; camera3 never appeared in a batch
-    #     (verified in policy_preprocessor.json).
+    #     Filling those slots with zero images instead adds visual tokens that were never
+    #     present during training, and accuracy drops. A checkpoint can declare three cameras
+    #     with empty_cameras=0 while its training rename_map only ever populated two.
     #
-    #   State: passed through at its full 8 dimensions, never truncated. The declared shape in
-    #     the config cannot be trusted. One checkpoint declares shape [6] while its training
-    #     dataset carries an 8-dimensional state, its own normalisation statistics are
-    #     8-dimensional, and the model pads to 32 via state_proj [960, 32]. Truncating to the
-    #     declared 6 desynchronises the normalisation statistics and breaks the policy. State is
-    #     withheld only from policies that declare no state feature at all.
+    #   State: passed through at its full 8 dimensions, never truncated. The shape declared in
+    #     the config cannot be trusted -- a checkpoint may declare 6 while its training data,
+    #     its normalisation statistics and its input projection are all built for 8, and
+    #     truncating to the declared width desynchronises the normalisation. State is withheld
+    #     only from policies that declare no state feature at all.
     #
     # Whether this mapping is right is settled empirically: run the nominal split and check it
     # against the published score. If it does not match, the mapping is wrong and that
@@ -198,11 +194,10 @@ def main():
             traceback.print_exc()
             try: send(conn, dict(ok=False, err=traceback.format_exc()[-2000:]))
             except Exception: pass
-            # CUDA errors are sticky: once a process has hit an out-of-memory condition,
-            # every later allocation fails even after VRAM frees up. The socket stays alive
-            # regardless, so every worker that connects to it dies in turn -- this cost 8 of
-            # 12 tasks once. Dying immediately is the correct behaviour; removing the socket
-            # lets the supervising script restart the server.
+            # CUDA errors are sticky: after an out-of-memory condition every later
+            # allocation fails even once VRAM frees up, while the socket stays alive and every
+            # worker that connects to it dies in turn. Exiting immediately is the correct
+            # behaviour; removing the socket lets a supervisor restart the server.
             if "CUDA error" in str(e) or "AcceleratorError" in type(e).__name__:
                 print("CUDA context is broken; shutting the server down", flush=True)
                 try: conn.close()

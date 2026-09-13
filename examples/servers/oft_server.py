@@ -31,11 +31,10 @@ for _v in ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS"):
 os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "3")
 os.environ.setdefault("TF_ENABLE_ONEDNN_OPTS", "0")
 # Import order matters: **timm must be imported before TensorFlow.**
-# In the order TF -> torch -> timm, importing timm segfaults (reproduced on two machines with
-# torch 2.13.0+cu130, torchvision 0.28.0+cu130, timm 0.9.10, TF 2.21.0). timm -> torch -> TF
-# is fine. TF cannot simply be dropped, because OFT's preprocessing does a JPEG round trip,
-# a lanczos3 resize and a center crop through it, so the order is the only way out.
-# openvla_utils imports tf at the top, so timm is pinned down here first.
+# In the order TF -> torch -> timm, importing timm segfaults; timm -> torch -> TF is fine.
+# TF cannot simply be dropped, because OFT's preprocessing does a JPEG round trip, a lanczos3
+# resize and a center crop through it. openvla_utils imports tf at the top, so timm is pinned
+# down here first.
 sys.path.insert(0, os.environ.get("OFT_HOME", os.path.expanduser("~/openvla-oft")))
 import timm  # noqa: F401  -- before TF
 import numpy as np, torch

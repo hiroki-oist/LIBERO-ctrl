@@ -44,8 +44,7 @@ _ROOT = os.path.dirname(_HERE)
 
 MANIFEST_DIR = os.environ.get("LIBERO_CTRL_MANIFEST", os.path.join(_ROOT, "manifests", "v0.1"))
 SUITES = ("libero_spatial", "libero_object", "libero_goal", "libero_10")
-SPLITS = {"clean": "rollouts_clean.jsonl", "eval": "rollouts_eval.jsonl",
-          "finetune": "rollouts_finetune.jsonl"}
+SPLITS = {"clean": "rollouts_clean.jsonl", "eval": "rollouts_eval.jsonl"}
 
 
 @dataclass(frozen=True)
@@ -165,8 +164,6 @@ class CtrlEnv:
         return out
 
 
-def _manifest():
-    return json.load(open(os.path.join(MANIFEST_DIR, "manifest.json")))
 
 
 def _default_seed() -> int:
@@ -206,6 +203,8 @@ class CtrlBenchmark:
         return np.asarray(self._init[self.rows[i]["task_id"]][self.rows[i]["init_id"]])
 
     def get_task_init_states(self, i: int) -> np.ndarray:
+        """LIBERO returns an array of initial states per task; here a row fixes exactly one,
+        so this returns it as a length-1 array. Present for drop-in compatibility."""
         return self.get_init_state(i)[None]
 
     def make_env(self, i: int, **kwargs) -> CtrlEnv:

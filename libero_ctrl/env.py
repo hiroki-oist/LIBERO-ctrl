@@ -1,20 +1,13 @@
-"""Constructing the env, and the invariants around it.
+"""Constructing the env, and the two invariants that govern it.
 
-Two rules, both learned the hard way:
+1. `seed_env()` is called immediately before the env is constructed. LIBERO's sim state does
+   not contain the placement of static bodies; shelves and stoves are positioned by robosuite's
+   placement sampler at construction time, and `set_init_state` does not restore them.
 
- 1. **Call seed_env() immediately before constructing the env.**
-    LIBERO's 92-dimensional sim state does not contain the placement of static bodies. Shelves
-    and stoves are positioned by robosuite's placement sampler at construction time, so without
-    a seed the same task with the same init_id puts them somewhere slightly different on every
-    run (6.5-18.8 mm across the ten libero_spatial tasks; the other three suites have no such
-    fixtures and are unaffected). set_init_state does not bring them back.
-
- 2. **One env per process.**
-    Two live LIBERO envs mix up their EGL rendering contexts and both depth and RGB come out
-    wrong -- this happens even across processes when they share a GPU. So parallelism is
-    one process per GPU, not several envs per process.
+2. One env per process. Two live LIBERO envs share and corrupt each other's EGL rendering
+   context, so parallelism is one process per GPU.
 """
-import os, sys, numpy as np
+import numpy as np
 
 _OPEN: dict = {}
 
@@ -33,48 +26,6 @@ def make_task(suite: str, task_id: int, *, res: int, seed: int):
 
 def close_task(task):
     task.close(); _OPEN.clear()
-
-
-def soft_reset(task):
-    """Clear the controller's internal state. Must be called before every rollout.
-
-    set_init_state writes back qpos/qvel only; the OSC controller's target pose and integral
-    terms survive from the previous rollout. Left alone, this produces a carry-over where the
-    first rollout in a process succeeds and later ones fail under identical conditions
-    (measured: libero_spatial task 0 went from 100% to 10%).
-
-    LIBERO's own evaluation avoids this by calling env.reset() every episode, but reset()
-    rebuilds the model and the renderer and costs seconds per rollout. Resetting the controller
-    alone is sufficient and costs nothing measurable.
-    """
-    for robot in task.env.env.robots:
-        c = getattr(robot, "controller", None)
-        if c is not None:
-            for fn in ("reset_goal", "update_initial_joints"):
-                f = getattr(c, fn, None)
-                if callable(f):
-                    try: f() if fn == "reset_goal" else None
-                    except Exception: pass
-        for attr in ("recent_ee_forcetorques", "recent_ee_pose", "recent_ee_vel",
-                     "recent_ee_vel_buffer", "recent_ee_acc", "recent_qpos",
-                     "recent_actions", "recent_torques"):
-            d = getattr(robot, attr, None)
-            if d is not None and hasattr(d, "clear"):
-                try: d.clear()
-                except Exception: pass
-
-
-def sim_reset(task):
-    """Reinitialise mjData, then reset the controller. The model is not rebuilt, so it is fast."""
-    task.sim.reset()
-    task.sim.data.ctrl[:] = 0
-    for robot in task.env.env.robots:
-        c = getattr(robot, "controller", None)
-        f = getattr(c, "reset_goal", None) if c is not None else None
-        if callable(f):
-            try: f()
-            except Exception: pass
-    task.sim.forward()
 
 
 def env_reset(task):

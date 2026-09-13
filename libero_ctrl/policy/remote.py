@@ -13,20 +13,16 @@ class RemotePolicy:
     """Send an observation, receive an action. Orientation and normalisation are the
     server's responsibility, not the benchmark's."""
 
-    def __init__(self, sock_path: str, name: str = "remote", task_string: str | None = None):
+    def __init__(self, sock_path: str, name: str = "remote"):
         self.name = name
         self.s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         self.s.connect(sock_path)
         send(self.s, dict(cmd="ping")); h, _ = recv(self.s)
         if not h.get("ok"): raise RuntimeError(h)
         self.n_params = h.get("params")
-        self.task_string = task_string        # when set, this string is sent instead of the row's
-
-    def set_task_string(self, s: str): self.task_string = s
 
     def reset(self, language: str, *, seed: int) -> None:
-        # Use task_string when one was set; otherwise the row's own instruction.
-        self._task = self.task_string if self.task_string is not None else language
+        self._task = language
         send(self.s, dict(cmd="reset", task=self._task, seed=int(seed)))
         h, _ = recv(self.s)
         if not h.get("ok"): raise RuntimeError(h.get("err"))

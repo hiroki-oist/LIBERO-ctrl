@@ -1,0 +1,242 @@
+{
+ "suite": "libero_object",
+ "task_id": 2,
+ "config": 0,
+ "init_id": 23,
+ "language": {
+  "nominal": "pick up the salad dressing and place it in the basket",
+  "L1": "pick up the salad dressing and place it into the basket",
+  "L2": "pick up the salad dressing and put it into the basket",
+  "L3": "find the salad dressing, pick it up, and then place it into the basket"
+ },
+ "actuation": {
+  "L1": {
+   "gain_log2": -0.00049,
+   "bias_frac": -0.003782,
+   "misalign_deg": 1.353588,
+   "lag_tau": -0.379031,
+   "noise_frac": 0.007271
+  },
+  "L2": {
+   "gain_log2": -0.000979,
+   "bias_frac": -0.007565,
+   "misalign_deg": 2.707176,
+   "lag_tau": -0.758063,
+   "noise_frac": 0.014542
+  },
+  "L3": {
+   "gain_log2": -0.001959,
+   "bias_frac": -0.01513,
+   "misalign_deg": 5.414353,
+   "lag_tau": -1.516126,
+   "noise_frac": 0.029084
+  }
+ },
+ "perturb": {
+  "camera": {
+   "L1": {
+    "d_azimuth_deg": 0.063986,
+    "d_elevation_deg": 0.80701,
+    "d_distance_m": 0.073102,
+    "d_lookat_x_m": -0.014915,
+    "d_lookat_y_m": 0.019136
+   },
+   "L2": {
+    "d_azimuth_deg": 0.127973,
+    "d_elevation_deg": 1.61402,
+    "d_distance_m": 0.146204,
+    "d_lookat_x_m": -0.02983,
+    "d_lookat_y_m": 0.038272
+   },
+   "L3": {
+    "d_azimuth_deg": 0.255945,
+    "d_elevation_deg": 3.228041,
+    "d_distance_m": 0.292408,
+    "d_lookat_x_m": -0.059661,
+    "d_lookat_y_m": 0.076545
+   }
+  },
+  "lighting": {
+   "L1": {
+    "d_intensity_ev": 0.004595,
+    "d_log2_warm": 0.031729,
+    "d_tint_g": -0.114222,
+    "d_log2_ambient": -0.191515,
+    "d_elevation_deg": 10.81545
+   },
+   "L2": {
+    "d_intensity_ev": 0.00919,
+    "d_log2_warm": 0.063458,
+    "d_tint_g": -0.228444,
+    "d_log2_ambient": -0.38303,
+    "d_elevation_deg": 21.6309
+   },
+   "L3": {
+    "d_intensity_ev": 0.01838,
+    "d_log2_warm": 0.126915,
+    "d_tint_g": -0.456888,
+    "d_log2_ambient": -0.76606,
+    "d_elevation_deg": 43.2618
+   }
+  },
+  "robot": {
+   "L1": {
+    "eef_dx_m": 0.035719,
+    "eef_dy_m": -0.029962,
+    "eef_dz_m": 0.018752,
+    "eef_rx_deg": -0.703369,
+    "eef_ry_deg": 1.496254,
+    "eef_rz_deg": 0.104095
+   },
+   "L2": {
+    "eef_dx_m": 0.071439,
+    "eef_dy_m": -0.059923,
+    "eef_dz_m": 0.037503,
+    "eef_rx_deg": -1.406738,
+    "eef_ry_deg": 2.992509,
+    "eef_rz_deg": 0.20819
+   },
+   "L3": {
+    "eef_dx_m": 0.142878,
+    "eef_dy_m": -0.119846,
+    "eef_dz_m": 0.075007,
+    "eef_rx_deg": -2.813475,
+    "eef_ry_deg": 5.985018,
+    "eef_rz_deg": 0.416379
+   }
+  },
+  "sensor": {
+   "L1": {
+    "noise_sigma": -0.000346,
+    "blur_sigma": -0.12865,
+    "jpeg_log2": 0.634535,
+    "motion_len": -0.8862
+   },
+   "L2": {
+    "noise_sigma": -0.000692,
+    "blur_sigma": -0.2573,
+    "jpeg_log2": 1.26907,
+    "motion_len": -1.7724
+   },
+   "L3": {
+    "noise_sigma": -0.001384,
+    "blur_sigma": -0.5146,
+    "jpeg_log2": 2.53814,
+    "motion_len": -3.5448
+   }
+  },
+  "combination": {
+   "L1": {
+    "camera": {
+     "d_azimuth_deg": 0.063986,
+     "d_elevation_deg": 0.80701,
+     "d_distance_m": 0.073102,
+     "d_lookat_x_m": -0.014915,
+     "d_lookat_y_m": 0.019136
+    },
+    "lighting": {
+     "d_intensity_ev": 0.004595,
+     "d_log2_warm": 0.031729,
+     "d_tint_g": -0.114222,
+     "d_log2_ambient": -0.191515,
+     "d_elevation_deg": 10.81545
+    },
+    "robot": {
+     "eef_dx_m": 0.035719,
+     "eef_dy_m": -0.029962,
+     "eef_dz_m": 0.018752,
+     "eef_rx_deg": -0.703369,
+     "eef_ry_deg": 1.496254,
+     "eef_rz_deg": 0.104095
+    },
+    "sensor": {
+     "noise_sigma": -0.000346,
+     "blur_sigma": -0.12865,
+     "jpeg_log2": 0.634535,
+     "motion_len": -0.8862
+    },
+    "actuation": {
+     "gain_log2": -0.00049,
+     "bias_frac": -0.003782,
+     "misalign_deg": 1.353588,
+     "lag_tau": -0.379031,
+     "noise_frac": 0.007271
+    }
+   },
+   "L2": {
+    "camera": {
+     "d_azimuth_deg": 0.127973,
+     "d_elevation_deg": 1.61402,
+     "d_distance_m": 0.146204,
+     "d_lookat_x_m": -0.02983,
+     "d_lookat_y_m": 0.038272
+    },
+    "lighting": {
+     "d_intensity_ev": 0.00919,
+     "d_log2_warm": 0.063458,
+     "d_tint_g": -0.228444,
+     "d_log2_ambient": -0.38303,
+     "d_elevation_deg": 21.6309
+    },
+    "robot": {
+     "eef_dx_m": 0.071439,
+     "eef_dy_m": -0.059923,
+     "eef_dz_m": 0.037503,
+     "eef_rx_deg": -1.406738,
+     "eef_ry_deg": 2.992509,
+     "eef_rz_deg": 0.20819
+    },
+    "sensor": {
+     "noise_sigma": -0.000692,
+     "blur_sigma": -0.2573,
+     "jpeg_log2": 1.26907,
+     "motion_len": -1.7724
+    },
+    "actuation": {
+     "gain_log2": -0.000979,
+     "bias_frac": -0.007565,
+     "misalign_deg": 2.707176,
+     "lag_tau": -0.758063,
+     "noise_frac": 0.014542
+    }
+   },
+   "L3": {
+    "camera": {
+     "d_azimuth_deg": 0.255945,
+     "d_elevation_deg": 3.228041,
+     "d_distance_m": 0.292408,
+     "d_lookat_x_m": -0.059661,
+     "d_lookat_y_m": 0.076545
+    },
+    "lighting": {
+     "d_intensity_ev": 0.01838,
+     "d_log2_warm": 0.126915,
+     "d_tint_g": -0.456888,
+     "d_log2_ambient": -0.76606,
+     "d_elevation_deg": 43.2618
+    },
+    "robot": {
+     "eef_dx_m": 0.142878,
+     "eef_dy_m": -0.119846,
+     "eef_dz_m": 0.075007,
+     "eef_rx_deg": -2.813475,
+     "eef_ry_deg": 5.985018,
+     "eef_rz_deg": 0.416379
+    },
+    "sensor": {
+     "noise_sigma": -0.001384,
+     "blur_sigma": -0.5146,
+     "jpeg_log2": 2.53814,
+     "motion_len": -3.5448
+    },
+    "actuation": {
+     "gain_log2": -0.001959,
+     "bias_frac": -0.01513,
+     "misalign_deg": 5.414353,
+     "lag_tau": -1.516126,
+     "noise_frac": 0.029084
+    }
+   }
+  }
+ }
+}

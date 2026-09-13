@@ -2,12 +2,13 @@
 # PY must point at a python where LIBERO works.
 PY ?= python3
 
-.PHONY: help smoke paper verify clean-out
+.PHONY: help smoke paper verify figs clean-out
 
 help:
 	@echo "make smoke   - check that all three entry levels run (a handful of rollouts)"
 	@echo "make paper   - regenerate the paper tables and figures from results/paper/ into analysis/out/"
 	@echo "make verify  - recompute the numbers the paper states, from the raw records"
+	@echo "make figs    - re-render docs/figs/perturbation_grid.png (needs a GPU)"
 
 smoke:
 	cd examples && PYTHONPATH=..:. MUJOCO_GL=egl $(PY) 01_dropin.py
@@ -31,6 +32,9 @@ verify:
 	$(PY) analysis/repeat_compare.py
 	$(PY) analysis/full_independent.py
 	$(PY) analysis/repB_recompute.py
+
+figs:
+	MUJOCO_GL=egl $(PY) analysis/fig_perturbation_grid.py
 
 clean-out:
 	find analysis/out -type f -name '*' -delete

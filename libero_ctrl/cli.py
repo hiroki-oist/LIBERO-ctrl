@@ -74,7 +74,7 @@ def cmd_run(a):
         try:
             with open(path, "a") as f:
                 for r in rs:
-                    out, _ = run_rollout(task, r, policy, res=a.res)
+                    out = run_rollout(task, r, policy, res=a.res)
                     f.write(json.dumps(out) + "\n"); f.flush(); n += 1
                     if n % 50 == 0:
                         el = time.time() - t0
@@ -123,8 +123,8 @@ def main(argv=None):
     r.add_argument("--suite", default=None, help="libero_spatial,... comma separated")
     r.add_argument("--res", type=int, default=128)
     r.add_argument("--shard", default=None, help="i/N; splits by task")
-    r.add_argument("--task", default=None, help="0,1,2; restrict to these tasks (for smoke tests)")
-    r.add_argument("--limit", type=int, default=None, help="first N rollouts only (for smoke tests)")
+    r.add_argument("--task", default=None, help="0,1,2; restrict to these task ids")
+    r.add_argument("--limit", type=int, default=None, help="first N rollouts only")
     r.add_argument("--policy-kw", action="append", default=[], metavar="K=V",
                    help="constructor argument for the policy, e.g. sock_path=/tmp/oft_0.sock")
     r.set_defaults(f=cmd_run)

@@ -47,9 +47,6 @@ class Perturbation:
     def reset(self, seed: int) -> None:
         """Called once at the start of a rollout: fix anything that must stay fixed within it."""
 
-    @property
-    def is_identity(self) -> bool:
-        return type(self) is Perturbation
 
 
 class Composite(Perturbation):

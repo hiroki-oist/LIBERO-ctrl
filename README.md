@@ -14,6 +14,12 @@ Every rollout is **paired**: the same task, the same initial state, the same pol
 without the perturbation. That is what makes the three-term decomposition of
 Section 4 of the paper possible.
 
+![Each axis at each severity level](docs/figs/perturbation_grid.png)
+
+One task, one initial state, one configuration index. `actuation` and `language` do not change
+the image and so are not in the figure; `docs/PERTURBATIONS.md` gives every parameter value
+behind this grid, including those two.
+
 ## The design requirement
 
 **If you already have a working LIBERO evaluation loop, adopting LIBERO-CTRL should cost you
@@ -213,7 +219,8 @@ calibration/        calibration.json: the σ that define the severity metric
 examples/           the three entry levels, plus the policy servers used for the paper
 results/paper/      raw per-rollout records behind the paper
 analysis/           table and figure generation
-docs/               protocol, calibration procedure, policies, exact run commands
+docs/               protocol, calibration, what a perturbation looks like,
+                    policies, exact run commands
 ```
 
 ## License
