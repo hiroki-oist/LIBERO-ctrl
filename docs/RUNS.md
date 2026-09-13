@@ -15,13 +15,13 @@ libero-ctrl run --policy libero_ctrl.policy.remote:RemotePolicy \
 
 | run | server | notes |
 |---|---|---|
+| `pi05_{clean,eval}` | `lerobot_server.py` | `--ckpt lerobot/pi05-libero` — `pi05_libero_base` is **not** fine-tuned and scores 0% |
 | `oft_{clean,eval}` | `oft_server.py` | one checkpoint per suite; `--suite` selects it |
 | `univla_{clean,eval}` | `univla_server.py` | one checkpoint per suite; 15.6 GB resident |
-| `minerva_{clean,eval}` | `minerva_server.py` | five axes only; canonical instruction |
-| `predvla_s13_{clean,eval}` | `pcvla_server.py` | seed 13 is the one the paper reports |
 | `smolvla_{clean,eval}` | `lerobot_server.py` | **`--n_action_steps 1` is required** |
 | `vlajepa_{clean,eval}` | `lerobot_server.py` | `--ckpt lerobot/VLA-JEPA-LIBERO` |
-| `pi05_{clean,eval}` | `lerobot_server.py` | `--ckpt lerobot/pi05-libero` — `pi05_libero_base` is **not** fine-tuned and scores 0% |
+| `predvla_s13_{clean,eval}` | `pcvla_server.py` | seed 13 is the one the paper reports |
+| `minerva_{clean,eval}` | `minerva_server.py` | five axes only; canonical instruction |
 
 `--shard i/N` splits the work by `(suite, task)` across processes; rerunning the same command
 resumes, since already-written `rollout_id`s are skipped.

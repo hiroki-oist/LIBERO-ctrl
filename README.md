@@ -148,11 +148,11 @@ Two things have to be pinned that LIBERO itself does not pin:
    per process. Nothing in the runtime draws a random number that is not derived from the
    manifest row.
 
-With both pinned, four of the seven policies measured here (MINERVA, PredVLA, OpenVLA-OFT,
-UniVLA) are deterministic in the sense that repeating a rollout in a fresh process reproduces its
-outcome. The other three (SmolVLA, VLA-JEPA, `π₀.₅`) sample at inference and reproduce only in
-aggregate; their per-rollout flip rates over a 60-rollout repeat design are 6.7%, 10.0% and 15.0%
-respectively, and 25,200 rollouts were re-collected independently to confirm that the reported
+With both pinned, four of the seven policies measured here (OpenVLA-OFT, UniVLA, PredVLA and
+MINERVA) are deterministic in the sense that repeating a rollout in a fresh process reproduces
+its outcome. The other three (`π₀.₅`, SmolVLA and VLA-JEPA) sample at inference and reproduce
+only in aggregate; their per-rollout flip rates over a 60-rollout repeat design are 15.0%, 6.7%
+and 10.0% respectively, and 25,200 rollouts were re-collected independently to confirm that the reported
 superposition effect `I` moves by at most 1.8 points in eight of nine policy × level cells.
 
 **Determinism is per GPU, not absolute.** Re-running the 500 nominal LIBERO-Spatial rollouts of
@@ -163,6 +163,8 @@ records:
 |---|---|---:|---:|
 | OpenVLA-OFT | same as the archive | **0 / 500** | 1 / 500 |
 | UniVLA | different from the archive | 4 / 500 (0.8%) | 141 / 500 (28%) |
+
+The seven policies, their checkpoints and their references are in `docs/POLICIES.md`.
 
 The UniVLA server reseeds `torch` and `numpy` at every rollout, so ordering and sharding are ruled
 out; what remains is floating-point non-determinism between GPU models. A 60-rollout repeat test
