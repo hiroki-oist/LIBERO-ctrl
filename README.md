@@ -211,7 +211,7 @@ calibration/        calibration.json: the σ that define the severity metric
 examples/           the three entry levels, plus the policy servers used for the paper
 results/paper/      raw per-rollout records behind the paper
 analysis/           table and figure generation
-docs/               protocol, calibration procedure, exact run commands
+docs/               protocol, calibration procedure, policies, exact run commands
 ```
 
 ## License
