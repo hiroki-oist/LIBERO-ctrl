@@ -58,7 +58,10 @@ def terms(d, L, keys):
     u = d["unit"]; N = len(keys)
     if N == 0: return None
     Sa = {a: sum(u[k][a] for k in keys)/N for a in AX}
-    S0 = d["S0"]
+    # S0 on the configurations being analysed, not on the whole nominal split: Sa is computed
+    # over these, and the restriction to nominally successful configurations then gives S0 = 1.
+    ini, ok = d["init"], d["ok"]
+    S0 = sum(ok[ini[k]] for k in keys)/N
     Sp = S0 * np.prod([Sa[a]/S0 for a in AX]) if S0 > 0 else float("nan")
     Si = float(np.prod([Sa[a] for a in AX]))
     a1 = [k for k in keys if all(u[k][a] for a in AX)]

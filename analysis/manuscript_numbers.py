@@ -50,9 +50,15 @@ for name,sz,cd,ed,pub in MODELS:
              clean_all=(sum(r["success"] for r in cl),len(cl)),
              eval_all=(sum(r["success"] for r in ev),len(ev)))
     cells={k:{} for k in full}
+    # The nominal rate that normalises the product predictor is taken over the configurations
+    # the perturbed conditions actually use, not over the whole nominal split: the per-axis
+    # rates are computed over those same configurations.
+    matched=collections.defaultdict(set)
+    for r in ev: matched[(r["suite"],r["task_id"])].add(r["init_id"])
     for r in cl:
         k=(r["suite"],r["task_id"])
-        if k in cells: cells[k].setdefault("clean",[]).append(r["success"])
+        if k in cells and r["init_id"] in matched[k]:
+            cells[k].setdefault("clean",[]).append(r["success"])
     for r in ev:
         k=(r["suite"],r["task_id"])
         if k in cells: cells[k].setdefault((r["axis"],r["level"]),[]).append(r["success"])

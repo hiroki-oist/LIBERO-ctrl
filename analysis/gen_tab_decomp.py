@@ -32,6 +32,17 @@ def load(ds):
         for f in glob.glob(f"{RESULTS}/{d}/*.jsonl"):
             for l in open(f): r=json.loads(l); o[r["rollout_id"]]=r
     return o
+def s0_matched(ok, init, ks):
+    """The nominal success rate on the configurations actually being analysed.
+
+    The per-axis rates Sa are computed over these same configurations, so S0 has to be too;
+    taking it over the whole nominal split would divide one population by another. It also
+    makes the restriction to nominally successful configurations give S0 = 1 exactly.
+    """
+    v = [ok[(k[0], k[1], init[k])] for k in ks]
+    return sum(v) / len(v)
+
+
 def counts(u, ks):
     N=len(ks); a1=[k for k in ks if all(u[k][a] for a in AX)]
     s=set(a1)
@@ -43,11 +54,14 @@ def counts(u, ks):
 rows=[]
 for name,ed,cd in POL:
     ev=load(ed); cl=load(cd)
-    S0=sum(r["success"] for r in cl.values())/len(cl)
-    u=collections.defaultdict(dict)
-    for r in ev.values(): u[(r["suite"],r["task_id"],r["level"],r["config"])][r["axis"]]=r["success"]
+    ok={(r["suite"],r["task_id"],r["init_id"]):r["success"] for r in cl.values() if r["axis"]=="clean"}
+    u=collections.defaultdict(dict); init={}
+    for r in ev.values():
+        k=(r["suite"],r["task_id"],r["level"],r["config"])
+        u[k][r["axis"]]=r["success"]; init[k]=r["init_id"]
     for L in ("L1","L2","L3"):
         ks=[k for k in u if k[2]==L and len(u[k])==7]
+        S0=s0_matched(ok,init,ks)
         N,b,c,na1,nsim,Sa=counts(u,ks)
         Sp=S0*np.prod([Sa[a]/S0 for a in AX]); Si=float(np.prod([Sa[a] for a in AX]))
         Sc=na1/N; Ss=nsim/N
