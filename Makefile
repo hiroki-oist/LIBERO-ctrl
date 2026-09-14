@@ -36,6 +36,7 @@ verify:
 
 figs:
 	MUJOCO_GL=egl $(PY) analysis/fig_perturbation_grid.py
+	MUJOCO_GL=egl $(PY) analysis/fig_perturbation_grid.py --paper
 
 clean-out:
 	find analysis/out -type f -name '*' -delete
