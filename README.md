@@ -200,6 +200,23 @@ libero-ctrl run --policy libero_ctrl.policy.remote:RemotePolicy \
                 --policy-kw sock_path=/tmp/oft.sock --split clean --suite libero_spatial --out out/
 ```
 
+### Running one of the paper's policies from scratch
+
+`setup/` does the whole of that for you, one command per policy: it clones the upstream code at
+the revision used here, builds its environment, downloads its checkpoint, starts its server and
+runs the reproduction gate.
+
+```bash
+bash setup/ctrl.sh    install        # once: LIBERO + robosuite + this package
+bash setup/lerobot.sh pi05 install   # π₀.₅'s own environment and checkpoint
+bash setup/lerobot.sh pi05 gate      # 2,000 nominal rollouts, checked against the published score
+bash setup/lerobot.sh pi05 eval      # the 8,400 perturbed rollouts
+```
+
+Six of the seven policies are covered — PredVLA's weights are not distributed. `setup/README.md`
+lists the measured cost of each run (2.5 to 54 hours for a gate, 13 to 294 for a perturbed run,
+single GPU) and the traps each script encodes.
+
 ---
 
 ## Reproducibility
@@ -279,6 +296,7 @@ libero_ctrl/        the package: benchmark.py (Level 0), perturb/ (Level 1), cli
 manifests/v0.1/     the experiment design — one JSON line per rollout
 calibration/        calibration.json: the σ that define the severity metric
 examples/           the three entry levels, plus the policy servers used for the paper
+setup/              one command per policy: upstream code, environment, checkpoint, gate
 results/paper/      raw per-rollout records behind the paper
 analysis/           table and figure generation
 docs/               protocol, calibration, what a perturbation looks like,
