@@ -6,7 +6,7 @@ policies, built on top of [LIBERO](https://github.com/Lifelong-Robot-Learning/LI
 This repository holds the material behind the paper: the raw per-rollout record of every number it
 reports, and the code that turns those records back into its tables and figures.
 
-## Reproducing the paper
+## Reproduction from the Archived Records
 
 ```bash
 make verify      # re-derive every number the paper states, from the raw records
@@ -14,42 +14,34 @@ make paper       # regenerate the tables and figures into analysis/out/
 ```
 
 Both read only the JSONL records in `results/paper/` — **162,098 rollouts across 72 runs, 34 MB.**
-No GPU, no simulator, no checkpoint and no download: Python 3.10 or newer with `numpy` and
-`matplotlib` is the whole dependency list. Measured here: `make paper` 23 s, `make verify` 2 min.
+No GPU, no simulator, no checkpoint, no download; Python 3.10+ with `numpy` and `matplotlib`.
+Measured here: `make paper` 23 s, `make verify` 2 min.
 
 | target | writes | in the paper |
 |---|---|---|
-| `make paper` | `analysis/out/summary.{json,md}` | `tab:axes` — success rate and `n` per policy × axis × level, per suite as well |
-| | `analysis/out/tab_decomp.tex` | `tab:decomp` — the three-term decomposition, typeset |
+| `make paper` | `analysis/out/summary.{json,md}` | `tab:axes` — success rate and `n` per policy × axis × level |
+| | `analysis/out/tab_decomp.tex` | `tab:decomp` — the three-term decomposition |
 | | `analysis/out/policy_profiles.{pdf,png}` | the per-policy axis profiles |
 | | `analysis/out/composition.{pdf,png}` | the composition figure |
 | | `docs/figs/axis_grid.{png,pdf}` | the grid below |
 | `make verify` | stdout, plus `analysis/out/manuscript_numbers.json` | every quoted number in Section 4 |
 
-`make verify` runs six checks in order: the nominal scores against the published aggregates, the
-decomposition with its cluster bootstrap, the emergent/compensated split, the single-axis
-re-collection, the 60-rollout repeat diagnostics, and the 25,200-rollout independent re-collection
-that bounds how far the superposition effect `I` moves when three sampling policies are run again.
+- `make verify` runs six checks: nominal scores against the published aggregates, the
+  decomposition with its cluster bootstrap, the emergent/compensated split, the single-axis
+  re-collection, the 60-rollout repeat diagnostics, and the 25,200-rollout independent
+  re-collection that bounds how far `I` moves when the three sampling policies are run again.
+- `docs/RESULTS_INDEX.md` identifies every run directory and the merge rule between the two
+  collection machines; `docs/RUNS.md` gives the exact command behind each.
 
-`docs/RESULTS_INDEX.md` says what every run directory is and how the two collection machines were
-merged; `docs/RUNS.md` gives the exact command behind each one.
-
-### Running it yourself, on a twentieth of the design
-
-`setup/` takes a policy from nothing to a scored run — it clones the upstream code at the revision
-used here, builds that policy's own environment, downloads its checkpoint, starts its server and
-runs the benchmark against it. The reduced benchmark is the one to start with:
+## Short Reproduction (1/20 of the Rollouts)
 
 ```bash
 bash setup/ctrl.sh install              # once: LIBERO + robosuite + this package
 bash setup/lerobot.sh pi05 install      # that policy's environment and checkpoint
-bash setup/small.sh pi05                # 100 nominal + 420 perturbed rollouts, and what they show
+bash setup/small.sh pi05                # 100 nominal + 420 perturbed rollouts
 ```
 
-`small.sh` takes any of the six policies. Only the install line differs between them, because
-four of them share one environment:
-
-| policy | install | reduced run | reduced | full nominal | full perturbed |
+| policy | install | short reproduction | short | full nominal | full perturbed |
 |---|---|---|---:|---:|---:|
 | π₀.₅ | `bash setup/lerobot.sh pi05 install` | `bash setup/small.sh pi05` | 1.2 h | 4.8 h | 19.6 h |
 | OpenVLA-OFT | `bash setup/oft.sh install` | `bash setup/small.sh oft` | 1.3 h | 4.5 h | 21.7 h |
@@ -58,37 +50,28 @@ four of them share one environment:
 | VLA-JEPA | `bash setup/lerobot.sh vlajepa install` | `bash setup/small.sh vlajepa` | 1.2 h | 5.4 h | 18.0 h |
 | MINERVA | `bash setup/lerobot.sh minerva install` | `bash setup/small.sh minerva` | 0.8 h | 2.5 h | 13.4 h |
 
-`small` draws a random 1/20 of the design, runs it, gates the nominal part, and ends by printing
-**your own version of the paper's two results**: the axis × level table, and the compound
-decomposition — `S_indep`, `D`, `S_conj`, `I`, `S_sim` per severity level, with the disagreement
-between the conjunction and the simultaneous condition split into emergent failures `R_e` and
-compensated successes `R_c`, written to `out/<policy>_decomposition.png`.
+- **Output.** The gate verdict, the run's own axis × level table, and its own compound
+  decomposition — `S_indep`, `D`, `S_conj`, `I`, `S_sim` per level, with the disagreement split
+  into emergent failures `R_e` and compensated successes `R_c` — in
+  `out/<policy>_decomposition.png`. `analysis/fig_run_decomposition.py` redraws it from any run
+  directory, a full one included.
+- **Sampling unit.** A random 1/20 of the *paired units*: one `(suite, task, level, config)`
+  carries the six single-axis rollouts and the simultaneous one on the same initial state.
+  `S_conj` is defined across that set, so sampling rollouts independently would cost the same and
+  lose it.
+- **Unseeded.** Two runs are two independent samples of the same design, not the same rollouts
+  twice. `SAMPLE=0.1` draws a tenth. The policy seed of a drawn rollout is still
+  `crc32(rollout_id)`.
+- **Precision.** 20 units per level and 20 rollouts per axis cell: a standard error near 11 points
+  at 50%. Signs and ordering reproduce; decimals do not.
+- **Cost.** The hours are the recorded per-rollout wall time summed per policy, off two machines
+  with 32 GB and 98 GB of GPU memory — the size of the job, not a measurement of your card. All
+  seven policies came to 755 GPU-hours, which is what the 34 MB of records saves.
+- **Coverage.** Six of the seven policies; the seventh is not publicly distributed.
 
-What it draws is a random 1/20 of the **paired units**: one `(suite, task, level, config)` carries
-the six single-axis rollouts and the simultaneous one, all from the same initial state, and the
-decomposition is computed across that set. Sampling rollouts independently would cost the same and
-leave `S_conj` — did this initial state survive every axis on its own — uncomputable. The draw is
-**unseeded**: two runs are two independent samples of the same design rather than the same rollouts
-twice, and `SAMPLE=0.1` draws a tenth instead. The policy seed of a drawn rollout is still
-`crc32(rollout_id)`, so a rollout that turns up in both runs is the same rollout.
+## Full Reproduction (10,400 Rollouts per Policy)
 
-At 1/20 each level rests on 20 paired units and each axis cell on 20 rollouts, a standard error of
-about 11 points at 50%. A reduced run therefore reproduces the *shape* — which axis is worst for
-this policy, whether `D` is positive, whether `I` turns negative as severity rises — and not the
-decimals. An hour of GPU time is enough to see whether the pipeline is wired up correctly and
-whether this benchmark says what it claims; `analysis/fig_run_decomposition.py` redraws the figure
-from any run directory, including a full one.
-
-The seventh policy in the paper is not publicly distributed and has no script here. The hours are
-the per-rollout wall time recorded when the paper's runs were collected, summed per policy; they
-came off two machines with 32 GB and 98 GB of GPU memory, so read them as the size of the job
-rather than as a measurement of your card. All seven together came to 755 GPU-hours, about a month
-on one card — which is what the 34 MB of records saves you.
-
-### The full design
-
-The same script that installed a policy runs its full design — `gate` and `eval` in place of
-`install`:
+The same script, with `gate` and `eval` in place of `install`:
 
 ```bash
 bash setup/lerobot.sh pi05 gate      # the 2,000 nominal rollouts, against the published score
@@ -97,71 +80,68 @@ bash setup/oft.sh gate               # the per-suite scripts take the action alo
 bash setup/univla.sh eval
 ```
 
-`gate` first: before any perturbation number means anything, the adapter has to reproduce the
-*nominal* score of the checkpoint, and a failure there is almost always an observation-mapping
-problem rather than a robustness result. `--shard i/N` splits either run by task across processes,
-and a re-run of the same command resumes — already-written `rollout_id`s are skipped, so an
-interrupted job costs nothing.
+- **`gate` first.** Before a perturbation number means anything the adapter has to reproduce the
+  *nominal* score of the checkpoint; a failure there is an observation-mapping problem, not a
+  robustness result.
+- **Sharding and resume.** `--shard i/N` splits a run by task across processes; a re-run skips
+  already-written `rollout_id`s, so an interruption costs nothing.
+- **Per-policy traps**, each one a flag in its script rather than a sentence to remember: the
+  un-finetuned π₀.₅ base checkpoint that scores 0%, SmolVLA's required `--n_action_steps 1`,
+  OpenVLA-OFT's 180° image rotation, UniVLA's per-suite checkpoints, and the canonical-instruction
+  manifest MINERVA has to be run with. `setup/README.md` has them, with the prerequisites (`uv`,
+  the Hugging Face CLI, ~120 GB of disk).
 
-`setup/README.md` has the prerequisites (`uv`, the Hugging Face CLI, ~120 GB of disk) and the trap
-each script encodes — the un-finetuned π₀.₅ base checkpoint that scores 0%, SmolVLA's required
-`--n_action_steps 1`, OpenVLA-OFT's 180° image rotation, UniVLA's per-suite checkpoints, the
-manifest MINERVA has to be run with because it cannot accept a paraphrase.
-
-## What is being measured
+## Benchmark Design
 
 ![Each axis at each severity level](docs/figs/perturbation_grid_paper.png)
 
-Seven axes — camera, lighting, robot initial pose, sensor, actuation, language, and all six at
-once — at three severity levels that are *equidistant by construction*: severity is the Euclidean
-radius `‖Δp/σ‖₂` in a parameter space normalised by per-parameter scales `σ` calibrated once,
-offline (`calibration/calibration.json`), and L1, L2 and L3 are radii 2, 4 and 8. A camera L2 and
-a lighting L2 are therefore the same distance from nominal, and within a level the ten
-configurations are *directions* on that sphere.
+- **Seven axes**: camera, lighting, robot initial pose, sensor, actuation, language, and all six
+  at once.
+- **Three severity levels, equidistant by construction.** Severity is the Euclidean radius
+  `‖Δp/σ‖₂` in a parameter space normalised by per-parameter scales `σ` calibrated once, offline
+  (`calibration/calibration.json`); L1, L2 and L3 are the radii 2, 4 and 8. A camera L2 and a
+  lighting L2 are the same distance from nominal, and within a level the ten configurations are
+  *directions* on that sphere.
+- **Paired rollouts.** Same task, same initial state, same policy seed, with and without the
+  perturbation. The decomposition of Section 4 needs that pairing and cannot be computed from
+  unpaired scores.
+- **The figure.** **(A)** the nominal observation. **(B)** actuation, the one axis that changes no
+  pixel: the end-effector path one fixed command sequence produces at each level, and the tracking
+  error that opens up. **(C)** the five axes that do change the image. `libero_object` task 2,
+  initial state 23, configuration 0 — *pick up the salad dressing and place it in the basket*;
+  `docs/PERTURBATIONS.md` gives every parameter value.
 
-Every rollout is **paired**: same task, same initial state, same policy seed, with and without the
-perturbation. The decomposition of Section 4 needs that pairing and cannot be computed from
-unpaired scores.
-
-**(A)** the nominal observation. **(B)** actuation, the one axis that changes no pixel, measured in
-the simulator: the end-effector path one fixed command sequence produces at each level, and the
-tracking error that opens up. **(C)** the five axes that do change the image.
-`libero_object` task 2, initial state 23, configuration 0 — *pick up the salad dressing and place
-it in the basket*. `docs/PERTURBATIONS.md` gives every parameter value.
-
-## What the numbers say
+## Results
 
 ![Success rate by policy and axis, clean to L3](docs/figs/axis_grid.png)
 
 Seven policies, 0.54 M to 7.54 B parameters, 2,000 nominal plus 8,400 perturbed rollouts each,
-`n = 400` per cell. The dashed line is that policy's own nominal score and the shaded area is what
-the axis takes away from it. The smallest policy's two rightmost cells are n/a: it resolves the
-instruction to an index in a fixed 40-task table, so a paraphrase is not an admissible input, its
-language axis is the identity, and neither cell measures what its column says.
+`n = 400` per cell. The dashed line is the policy's own nominal score, the shaded area what the
+axis takes from it. The smallest policy's two rightmost cells are n/a: it resolves the instruction
+to an index in a fixed 40-task table, so its language axis is the identity and neither cell
+measures what its column says.
 
-- **Which axis hurts most is not shared.** UniVLA keeps 3.8% under camera L3 but 88.8% under
-  lighting L3; MINERVA is the other way round — lighting takes it from 93.9% to 12.0% while camera
-  leaves 26.0%. OpenVLA-OFT's worst single axis at L3 is the robot initial pose (44.8%), not
-  camera (69.8%). A single robustness score hides all of this, and so does any benchmark that
-  perturbs one thing.
-- **The language axis separates policies more sharply than any visual axis, and not by scale.** At
-  L3 the loss relative to a policy's own nominal score runs from 4.1 points (2.77 B) to 54.8
-  (450 M) and 79.0 (0.68 M), with paraphrases that preserve every content word. It is also
-  approximately binary: only SmolVLA degrades monotonically across L1–L3; the others take their
-  whole loss at L1 and are then flat (OpenVLA-OFT reads 90.8 / 90.0 / 89.8). A severity scale
-  calibrated on geometry and photometry does not transfer to text.
-- **The conventional compositionality residual conflates three things.** Six axes each at radius
-  `r` sit at `√6·r` in the joint space, so the simultaneous condition at L1 is already a longer
-  displacement than any single axis at L3, and at L3 no policy exceeds 18.2%. Decomposing
-  `S_sim − S_prod` into nominal-score normalisation `B`, cross-axis survival dependence `D` and
-  the superposition effect `I` shows that `B` is the largest of the three in nine of the fifteen
-  resolvable cells, that `D > 0` everywhere it resolves — the states that fail under one axis are
-  disproportionately those that fail under another — and that the residual's sign is not the
-  interaction's sign. OpenVLA-OFT at L1 reads as perfectly compositional (residual −0.8) and
-  decomposes into −12.6 + 4.6 + 7.3, with `I = +7.3` points, `p = 0.004`; VLA-JEPA at L1 reads as
-  clearly negative (−6.3) and decomposes into −10.7 + 5.4 − 1.0, with `I` indistinguishable from
-  zero. The conventional metric errs in both directions, and which direction cannot be inferred
-  from its value.
+- **Which axis hurts most is not shared.** UniVLA keeps 3.8% under camera L3 and 88.8% under
+  lighting L3; MINERVA is the other way round, lighting taking it from 93.9% to 12.0% while camera
+  leaves 26.0%. OpenVLA-OFT's worst single axis at L3 is the initial pose (44.8%), not camera
+  (69.8%). One robustness score hides this, and so does perturbing one thing.
+- **Language separates policies more sharply than any visual axis, and not by scale.** At L3 the
+  loss relative to a policy's own nominal score runs from 4.1 points (2.77 B) to 54.8 (450 M) and
+  79.0 (0.68 M), under paraphrases that preserve every content word. It is also approximately
+  binary: only SmolVLA degrades monotonically; the others take their whole loss at L1 and are then
+  flat (OpenVLA-OFT: 90.8 / 90.0 / 89.8). A severity scale calibrated on geometry and photometry
+  does not transfer to text.
+- **The conventional compositionality residual conflates three quantities.** `S_sim − S_prod`
+  decomposes into nominal-score normalisation `B`, cross-axis survival dependence `D`, and the
+  superposition effect `I`. `B` is the largest term in nine of the fifteen resolvable cells;
+  `D > 0` wherever it resolves — the states that fail under one axis are disproportionately those
+  that fail under another; and the residual's sign is not the interaction's sign. OpenVLA-OFT at
+  L1 reads as perfectly compositional (residual −0.8) yet decomposes into −12.6 + 4.6 + 7.3, with
+  `I = +7.3`, `p = 0.004`; VLA-JEPA at L1 reads as clearly negative (−6.3), decomposes into
+  −10.7 + 5.4 − 1.0, and its `I` is indistinguishable from zero.
+- **Simultaneous perturbation is not a mild extrapolation.** Six axes each at radius `r` sit at
+  `√6·r` in the joint space, so the simultaneous condition at L1 is already a longer displacement
+  than any single axis at L3; at L3 no policy exceeds 18.2%.
 
 <details>
 <summary><b>The same grid as a table</b></summary>
@@ -171,7 +151,7 @@ breakdowns and the counts behind every cell.
 
 </details>
 
-## Layout
+## Repository Layout
 
 ```
 results/paper/      the raw per-rollout records behind every number in the paper
