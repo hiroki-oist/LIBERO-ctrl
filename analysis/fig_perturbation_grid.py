@@ -103,17 +103,29 @@ def draw_reference(plt, grid, *, width, act=None):
     nom = fig.add_subplot(gs[0, 0])
     _panel(nom, grid[("clean", VISUAL[0])], title=COL_LABEL["clean"])
     nom.set_anchor("SW")        # sit above the actuation block rather than centred in the cell
+    _letter(nom, "A)", -0.20, 1.02)
+    first = None
     for i, L in enumerate(LEVELS):
         for j, axis in enumerate(VISUAL):
-            _panel(fig.add_subplot(gs[i, j + 2]), grid[(L, axis)],
-                   title=ROW_LABEL[axis] if i == 0 else None,
-                   ylabel=COL_LABEL[L] if j == 0 else None)
+            h = _panel(fig.add_subplot(gs[i, j + 2]), grid[(L, axis)],
+                       title=ROW_LABEL[axis] if i == 0 else None,
+                       ylabel=COL_LABEL[L] if j == 0 else None)
+            if first is None: first = h
     if act is not None:
-        _actuation_block(fig, gs[1:, 0], act)
+        b = _actuation_block(fig, gs[1:, 0], act)
+        _letter(b, "B)", -0.42, 1.10)
+    _letter(first, "C)" if act is not None else "B)", -0.30, 1.13)
     return fig
 
 
 COLOUR_L = {"L1": "#4C72B0", "L2": "#DD8452", "L3": "#C44E52"}
+
+
+def _letter(ax, text, x, y):
+    """A panel letter, in the axes' own coordinates so it follows the panel it belongs to."""
+    import matplotlib as mpl
+    ax.text(x, y, text, transform=ax.transAxes, ha="left", va="bottom", clip_on=False,
+            fontsize=mpl.rcParams["font.size"] * 1.2, fontweight="bold")
 
 
 def _actuation_block(fig, cell, act, config=0):
@@ -158,6 +170,7 @@ def _actuation_block(fig, cell, act, config=0):
     a2.set_ylabel("tracking error (mm)", fontsize=fs * 0.8, labelpad=1)
     a2.set_title("Actuation: error", fontsize=fs * 0.95, pad=3)
     a2.set_ylim(bottom=0)
+    return a1
 
 
 def _panel(h, img, *, title=None, ylabel=None):
@@ -169,6 +182,7 @@ def _panel(h, img, *, title=None, ylabel=None):
         sp.set_linewidth(0.4); sp.set_color("0.55")
     if title:  h.set_title(title, fontsize=fs, pad=4)
     if ylabel: h.set_ylabel(ylabel, fontsize=fs, labelpad=4)
+    return h
 
 
 def main():

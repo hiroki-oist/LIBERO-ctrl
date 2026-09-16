@@ -14,11 +14,49 @@ Every rollout is **paired**: the same task, the same initial state, the same pol
 without the perturbation. That is what makes the three-term decomposition of
 Section 4 of the paper possible.
 
-![Each axis at each severity level](docs/figs/perturbation_grid.png)
+![Each axis at each severity level](docs/figs/perturbation_grid_paper.png)
 
-One task, one initial state, one configuration index. `actuation` and `language` do not change
-the image and so are not in the figure; `docs/PERTURBATIONS.md` gives every parameter value
-behind this grid, including those two.
+One task, one initial state, one configuration index: `libero_object` task 2, initial state 23,
+configuration 0 — *pick up the salad dressing and place it in the basket*. **(A)** the nominal
+observation. **(B)** actuation, the one axis that changes no pixel, measured in the simulator: the
+end-effector path one fixed command sequence produces at each level, and the tracking error that
+opens up. **(C)** the five axes that do change the image, at each severity level. Language is text
+and is listed below; `docs/PERTURBATIONS.md` gives every parameter value behind this figure.
+
+### Why these seven
+
+None of them is an attack. Each is a difference a policy meets the first time it runs somewhere
+other than where it was trained — and each is a documented reason a sim-trained policy stops
+working on real hardware. The numbers are the L3 values of the configuration in the figure.
+
+- **Camera** — *the calibration you had yesterday is not the one you have today.* A camera
+  unbolted and remounted, a tripod nudged by a cable, a new mounting plate: the scene is the
+  same, the viewpoint is not. L3 moves the agentview 3.2° in elevation, 29 cm in distance and
+  shifts its look-at point 6 cm across the table.
+- **Lighting** — *the same room at a different hour.* Blinds open, the overhead fluorescents on
+  instead of off, a different LED panel with a different colour temperature. L3 drops the ambient
+  term to 59% of nominal, pulls the green channel down by a third — a magenta cast — and raises
+  the key light by 43°.
+- **Robot initial pose** — *nobody resets to the same pose twice.* A human re-positions the arm by
+  hand, or the controller restarts with a different home. L3 starts the end-effector 20 cm away
+  from where it started in training, rotated by up to 6°.
+- **Sensor** — *the camera on the robot is not the camera in the renderer.* Frames arrive JPEG-
+  compressed over a network, the shutter smears while the arm moves, the gain climbs in a dim
+  room. L3 takes JPEG quality down to about 17, adds half a pixel of blur and three and a half
+  pixels of motion smear at 128×128.
+- **Actuation** — *commanded is not achieved.* Payload, friction, joint backlash, a controller
+  tuned for a different arm: the policy asks for a motion and the hardware delivers a rotated,
+  lagged, slightly wrong one. The axis is calibrated to the end-effector tracking error of real
+  hardware — 10, 20 and 40 mm at L1, L2 and L3 — and at L3 that is 5.4° of misalignment and 1.5
+  control steps of lag.
+- **Language** — *the operator does not speak in the template.* The instruction a policy was
+  trained on is one phrasing of many: *place it in* becomes *put it into*, then *find the salad
+  dressing, pick it up, and then place it into the basket*. No content word changes.
+- **All six at once** — *deployment does not change one thing at a time.* Moving to a new lab
+  changes the camera mount, the lights, the reset pose, the camera model, the controller and the
+  person giving the instruction, simultaneously. Six axes each at radius `r` sit at `√6·r` in the
+  joint space, so the simultaneous condition at L1 is already a longer displacement than any
+  single axis at L3.
 
 ## Results
 
