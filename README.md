@@ -32,27 +32,15 @@ are in `docs/POLICIES.md`, the raw per-rollout records in `results/paper/`.
 
 ![Success rate by policy and axis, clean to L3](docs/figs/axis_grid.png)
 
-Grey marks MINERVA's language and combination cells: it resolves the instruction to an index in a
-fixed 40-task table, so a paraphrase is not an admissible input and the axis is the identity for it
-by construction. Regenerate with `python analysis/fig_axis_grid.py`.
+MINERVA's two rightmost cells are n/a: it resolves the instruction to an index in a fixed 40-task
+table, so a paraphrase is not an admissible input, the language axis is the identity for it, and
+neither cell measures what its column says. Regenerate with `python analysis/fig_axis_grid.py`.
 
 <details>
 <summary><b>The same numbers as a table</b></summary>
 
 | policy (params, nominal) | level | camera | lighting | robot | sensor | actuation | language | all six at once |
 |---|---|---:|---:|---:|---:|---:|---:|---:|
-| **MINERVA**\* (0.54 M, 93.9) | L1 | 79.5 | 70.8 | 94.8 | 93.2 | 94.5 | 93.5 | 58.8 |
-|  | L2 | 56.2 | 38.8 | 89.2 | 94.5 | 93.8 | 93.2 | 18.5 |
-|  | L3 | 26.0 | 12.0 | 66.2 | 83.8 | 85.8 | 93.5 | 1.5 |
-| **PredVLA** (0.68 M, 79.3) | L1 | 73.0 | 78.2 | 73.0 | 79.2 | 80.0 | 1.8 | 1.2 |
-|  | L2 | 63.7 | 77.5 | 52.8 | 78.0 | 75.2 | 0.0 | 0.0 |
-|  | L3 | 63.0 | 76.8 | 25.8 | 67.2 | 62.7 | 0.2 | 0.2 |
-| **SmolVLA†** (450 M, 76.3) | L1 | 63.7 | 75.2 | 63.2 | 76.0 | 74.0 | 38.8 | 28.7 |
-|  | L2 | 44.8 | 73.5 | 46.0 | 75.5 | 72.2 | 28.7 | 10.0 |
-|  | L3 | 24.8 | 70.8 | 24.8 | 43.5 | 62.7 | 21.5 | 0.8 |
-| **VLA-JEPA** (2.77 B, 97.6) | L1 | 95.2 | 98.2 | 98.2 | 95.0 | 98.5 | 96.0 | 87.0 |
-|  | L2 | 85.5 | 98.2 | 92.5 | 72.0 | 96.0 | 94.8 | 44.2 |
-|  | L3 | 66.8 | 95.2 | 72.8 | 36.5 | 92.2 | 93.5 | 8.0 |
 | **π₀.₅** (4.14 B, 96.2) | L1 | 91.5 | 98.2 | 94.0 | 96.8 | 98.2 | 86.2 | 77.5 |
 |  | L2 | 80.8 | 98.0 | 87.5 | 97.0 | 96.2 | 79.8 | 50.2 |
 |  | L3 | 56.0 | 95.5 | 66.8 | 87.5 | 91.5 | 80.5 | 18.2 |
@@ -62,11 +50,24 @@ by construction. Regenerate with `python analysis/fig_axis_grid.py`.
 | **UniVLA** (7.54 B, 93.9) | L1 | 63.7 | 93.2 | 90.5 | 93.5 | 95.8 | 87.5 | 46.5 |
 |  | L2 | 24.0 | 92.2 | 81.8 | 79.5 | 93.0 | 86.5 | 6.2 |
 |  | L3 | 3.8 | 88.8 | 52.5 | 20.0 | 86.0 | 88.5 | 0.0 |
+| **SmolVLA†** (450 M, 76.3) | L1 | 63.7 | 75.2 | 63.2 | 76.0 | 74.0 | 38.8 | 28.7 |
+|  | L2 | 44.8 | 73.5 | 46.0 | 75.5 | 72.2 | 28.7 | 10.0 |
+|  | L3 | 24.8 | 70.8 | 24.8 | 43.5 | 62.7 | 21.5 | 0.8 |
+| **VLA-JEPA** (2.77 B, 97.6) | L1 | 95.2 | 98.2 | 98.2 | 95.0 | 98.5 | 96.0 | 87.0 |
+|  | L2 | 85.5 | 98.2 | 92.5 | 72.0 | 96.0 | 94.8 | 44.2 |
+|  | L3 | 66.8 | 95.2 | 72.8 | 36.5 | 92.2 | 93.5 | 8.0 |
+| **PredVLA** (0.68 M, 79.3) | L1 | 73.0 | 78.2 | 73.0 | 79.2 | 80.0 | 1.8 | 1.2 |
+|  | L2 | 63.7 | 77.5 | 52.8 | 78.0 | 75.2 | 0.0 | 0.0 |
+|  | L3 | 63.0 | 76.8 | 25.8 | 67.2 | 62.7 | 0.2 | 0.2 |
+| **MINERVA**\* (0.54 M, 93.9) | L1 | 79.5 | 70.8 | 94.8 | 93.2 | 94.5 | n/a | n/a |
+|  | L2 | 56.2 | 38.8 | 89.2 | 94.5 | 93.8 | n/a | n/a |
+|  | L3 | 26.0 | 12.0 | 66.2 | 83.8 | 85.8 | n/a | n/a |
 
 \*MINERVA resolves the instruction to an index in a fixed 40-task table, so a paraphrase is not an
-admissible input. Its language and combination cells are measured under the canonical instruction —
-the language axis is the identity for it by construction — and it is excluded from any claim about
-language sensitivity.
+admissible input and the language axis is the identity for it. Neither that cell nor the
+simultaneous one — five effective perturbations plus an identity control — measures what its column
+says, so both are n/a here. The paper reports them under the canonical instruction, with the same
+caveat.
 †SmolVLA's released checkpoint is trained for an eighth of the published sample budget (25,000
 steps at batch 32) and reaches 76.3% nominal against a published 87.3%; 76.3% is the reference
 score for *this checkpoint*, not a failed reproduction.
@@ -87,7 +88,8 @@ Three things this shows:
   photometry does not transfer to text.
 - **The six axes at once cost more than any of them alone.** Combination L1 is already a longer
   displacement in the normalised parameter space than any single-axis L3; at L3 no policy exceeds
-  18.2%, and for every policy the combination cell sits at or below its own worst single axis.
+  18.2%, and for every policy with an interpretable simultaneous cell it sits at or below that
+  policy's own worst single axis.
   Whether that is a genuine interaction is exactly what the paired design is for: the conventional
   compositionality residual turns out to conflate nominal-score normalisation, cross-axis survival
   dependence and superposition, and it gets the sign of the last one wrong in both directions

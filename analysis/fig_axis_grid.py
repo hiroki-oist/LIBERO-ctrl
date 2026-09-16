@@ -26,17 +26,18 @@ import matplotlib.pyplot as plt
 
 AXES = ["camera", "lighting", "robot", "sensor", "actuation", "language", "combination"]
 HEAD = ["Camera", "Lighting", "Initial pose", "Sensor", "Actuation", "Language", "All six\nat once"]
-POL = [("MINERVA$^{*}$", "0.54 M", "minerva"),
-       ("PredVLA",       "0.68 M", "predvla_s13"),
+POL = [(r"$\pi_{0.5}$",  "4.14 B", "pi05"),
+       ("OpenVLA-OFT",   "7.54 B", "oft"),
+       ("UniVLA",        "7.54 B", "univla"),
        ("SmolVLA",       "450 M",  "smolvla"),
        ("VLA-JEPA",      "2.77 B", "vlajepa"),
-       (r"$\pi_{0.5}$",  "4.14 B", "pi05"),
-       ("OpenVLA-OFT",   "7.54 B", "oft"),
-       ("UniVLA",        "7.54 B", "univla")]
+       ("PredVLA",       "0.68 M", "predvla_s13"),
+       ("MINERVA$^{*}$", "0.54 M", "minerva")]
 # MINERVA resolves the instruction to an index in a fixed table, so a paraphrase is not an
-# admissible input: these two cells are measured under the canonical instruction and the axis
-# is the identity for it. Drawn in grey so they are not read as a language result.
-IDENTITY = {("minerva", "language"), ("minerva", "combination")}
+# admissible input. Its language axis is the identity, which makes both that cell and the
+# simultaneous one -- five effective perturbations plus an identity control -- uninterpretable
+# as a result for those axes. They are left empty rather than plotted.
+NA = {("minerva", "language"), ("minerva", "combination")}
 
 INK   = "#3D6FA8"      # the one hue; identity comes from the labels
 GREY  = "#9AA0A6"
@@ -68,15 +69,16 @@ for i, (name, size, run) in enumerate(POL):
     s0 = 100 * sum(r["success"] for r in cl) / len(cl)
     for j, axis in enumerate(AXES):
         a = grid[i][j]
-        ys = [s0] + [rate(ev, axis, lv) for lv in ("L1", "L2", "L3")]
-        col = GREY if (run, axis) in IDENTITY else INK
-        a.axhline(s0, color=RULE, lw=0.8, ls=(0, (3, 2)), zorder=1)
-        a.fill_between(X, ys, s0, color=col, alpha=0.13, lw=0, zorder=2)
-        a.plot(X, ys, "-o", color=col, lw=1.7, ms=3.6, mew=0, zorder=3,
-               solid_capstyle="round")
-        a.annotate(f"{ys[-1]:.0f}", (3, ys[-1]), textcoords="offset points",
-                   xytext=(4, -1), ha="left", va="center", fontsize=7.5,
-                   color=MUTED if (run, axis) in IDENTITY else TEXT)
+        if (run, axis) in NA:
+            a.text(1.5, 50, "n/a", ha="center", va="center", fontsize=9, color=GREY)
+        else:
+            ys = [s0] + [rate(ev, axis, lv) for lv in ("L1", "L2", "L3")]
+            a.axhline(s0, color=RULE, lw=0.8, ls=(0, (3, 2)), zorder=1)
+            a.fill_between(X, ys, s0, color=INK, alpha=0.13, lw=0, zorder=2)
+            a.plot(X, ys, "-o", color=INK, lw=1.7, ms=3.6, mew=0, zorder=3,
+                   solid_capstyle="round")
+            a.annotate(f"{ys[-1]:.0f}", (3, ys[-1]), textcoords="offset points",
+                       xytext=(4, -1), ha="left", va="center", fontsize=7.5, color=TEXT)
         a.set_ylim(-6, 112); a.set_xlim(-0.3, 4.25)
         a.set_xticks(X); a.set_xticklabels(XT, fontsize=7.5)
         a.set_yticks([0, 50, 100])
