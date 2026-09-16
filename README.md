@@ -93,7 +93,7 @@ in increasing order of how much of your own code you keep.
 ## Install
 
 ```bash
-git clone git@github.com:hiroki-oist/LIBERO-ctrl.git && cd Libero_CTRL
+git clone git@github.com:hiroki-oist/LIBERO-ctrl.git && cd LIBERO-ctrl
 pip install -e .        # into the SAME environment your LIBERO evaluation already runs in
 ```
 
