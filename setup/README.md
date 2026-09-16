@@ -12,14 +12,14 @@ bash setup/lerobot.sh pi05 gate          # 2,000 nominal rollouts, checked again
 bash setup/lerobot.sh pi05 eval          # the 8,400 perturbed rollouts
 ```
 
-| policy | command | reduced run | nominal gate | perturbed run |
-|---|---|---:|---:|---:|
-| π₀.₅ | `setup/lerobot.sh pi05` | 1.2 h | 4.8 h | 19.6 h |
-| SmolVLA | `setup/lerobot.sh smolvla` | 17.4 h | 54.4 h | 294.4 h |
-| VLA-JEPA | `setup/lerobot.sh vlajepa` | 1.2 h | 5.4 h | 18.0 h |
-| MINERVA | `setup/lerobot.sh minerva` | 0.8 h | 2.5 h | 13.4 h |
-| OpenVLA-OFT | `setup/oft.sh` | 1.3 h | 4.5 h | 21.7 h |
-| UniVLA | `setup/univla.sh` | 9.0 h | 19.9 h | 159.2 h |
+| policy | install / gate / eval | reduced run | reduced | nominal gate | perturbed run |
+|---|---|---|---:|---:|---:|
+| π₀.₅ | `bash setup/lerobot.sh pi05 <action>` | `bash setup/small.sh pi05` | 1.2 h | 4.8 h | 19.6 h |
+| SmolVLA | `bash setup/lerobot.sh smolvla <action>` | `bash setup/small.sh smolvla` | 17.4 h | 54.4 h | 294.4 h |
+| VLA-JEPA | `bash setup/lerobot.sh vlajepa <action>` | `bash setup/small.sh vlajepa` | 1.2 h | 5.4 h | 18.0 h |
+| MINERVA | `bash setup/lerobot.sh minerva <action>` | `bash setup/small.sh minerva` | 0.8 h | 2.5 h | 13.4 h |
+| OpenVLA-OFT | `bash setup/oft.sh <action>` | `bash setup/small.sh oft` | 1.3 h | 4.5 h | 21.7 h |
+| UniVLA | `bash setup/univla.sh <action>` | `bash setup/small.sh univla` | 9.0 h | 19.9 h | 159.2 h |
 
 The hours are measured, not estimated: the sum of the `wall_s` field over the paper's own records
 for that policy, collected on two machines with 32 GB and 98 GB of GPU memory. Read them as the

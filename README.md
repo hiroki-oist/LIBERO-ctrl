@@ -41,10 +41,22 @@ used here, builds that policy's own environment, downloads its checkpoint, start
 runs the benchmark against it. The reduced benchmark is the one to start with:
 
 ```bash
-bash setup/ctrl.sh install           # once: LIBERO + robosuite + this package
-bash setup/lerobot.sh pi05 install   # that policy's environment and checkpoint
-bash setup/small.sh pi05             # 100 nominal + 420 perturbed rollouts, then the table they make
+bash setup/ctrl.sh install              # once: LIBERO + robosuite + this package
+bash setup/lerobot.sh pi05 install      # that policy's environment and checkpoint
+bash setup/small.sh pi05                # 100 nominal + 420 perturbed rollouts, and what they show
 ```
+
+`small.sh` takes any of the six policies. Only the install line differs between them, because
+four of them share one environment:
+
+| policy | install | reduced run | reduced | full nominal | full perturbed |
+|---|---|---|---:|---:|---:|
+| π₀.₅ | `bash setup/lerobot.sh pi05 install` | `bash setup/small.sh pi05` | 1.2 h | 4.8 h | 19.6 h |
+| OpenVLA-OFT | `bash setup/oft.sh install` | `bash setup/small.sh oft` | 1.3 h | 4.5 h | 21.7 h |
+| UniVLA | `bash setup/univla.sh install` | `bash setup/small.sh univla` | 9.0 h | 19.9 h | 159.2 h |
+| SmolVLA | `bash setup/lerobot.sh smolvla install` | `bash setup/small.sh smolvla` | 17.4 h | 54.4 h | 294.4 h |
+| VLA-JEPA | `bash setup/lerobot.sh vlajepa install` | `bash setup/small.sh vlajepa` | 1.2 h | 5.4 h | 18.0 h |
+| MINERVA | `bash setup/lerobot.sh minerva install` | `bash setup/small.sh minerva` | 0.8 h | 2.5 h | 13.4 h |
 
 `small` draws a random 1/20 of the design, runs it, gates the nominal part, and ends by printing
 **your own version of the paper's two results**: the axis × level table, and the compound
@@ -67,16 +79,7 @@ decimals. An hour of GPU time is enough to see whether the pipeline is wired up 
 whether this benchmark says what it claims; `analysis/fig_run_decomposition.py` redraws the figure
 from any run directory, including a full one.
 
-| policy | command | reduced run | full nominal | full perturbed |
-|---|---|---:|---:|---:|
-| π₀.₅ | `bash setup/lerobot.sh pi05 <action>` | 1.2 h | 4.8 h | 19.6 h |
-| OpenVLA-OFT | `bash setup/oft.sh <action>` | 1.3 h | 4.5 h | 21.7 h |
-| UniVLA | `bash setup/univla.sh <action>` | 9.0 h | 19.9 h | 159.2 h |
-| SmolVLA | `bash setup/lerobot.sh smolvla <action>` | 17.4 h | 54.4 h | 294.4 h |
-| VLA-JEPA | `bash setup/lerobot.sh vlajepa <action>` | 1.2 h | 5.4 h | 18.0 h |
-| MINERVA | `bash setup/lerobot.sh minerva <action>` | 0.8 h | 2.5 h | 13.4 h |
-
-Six of the seven policies have a script; the seventh is not publicly distributed. The hours are
+The seventh policy in the paper is not publicly distributed and has no script here. The hours are
 the per-rollout wall time recorded when the paper's runs were collected, summed per policy; they
 came off two machines with 32 GB and 98 GB of GPU memory, so read them as the size of the job
 rather than as a measurement of your card. All seven together came to 755 GPU-hours, about a month
@@ -84,9 +87,14 @@ on one card — which is what the 34 MB of records saves you.
 
 ### The full design
 
+The same script that installed a policy runs its full design — `gate` and `eval` in place of
+`install`:
+
 ```bash
 bash setup/lerobot.sh pi05 gate      # the 2,000 nominal rollouts, against the published score
 bash setup/lerobot.sh pi05 eval      # the 8,400 perturbed rollouts
+bash setup/oft.sh gate               # the per-suite scripts take the action alone
+bash setup/univla.sh eval
 ```
 
 `gate` first: before any perturbation number means anything, the adapter has to reproduce the
