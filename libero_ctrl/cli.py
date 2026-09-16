@@ -107,6 +107,11 @@ def cmd_run(a):
     for r in rows: by_task[(r["suite"], r["task_id"])].append(r)
 
     policy = _load_policy(a.policy, a.policy_kw)
+    # One progress line every 5% of the run, so a 100-rollout sample reports as often as the
+    # 8,400-rollout split does. LIBERO prints "using task orders ..." once per env it builds,
+    # which is once per (suite, task) group below, not once per rollout.
+    step = max(1, min(50, len(rows) // 20))
+    print(f"{len(rows)} rollouts over {len(by_task)} task cells -> {a.out}", flush=True)
     t0, n = time.time(), 0
     for (suite, tid), rs in sorted(by_task.items()):
         # env_seed comes from the manifest -- it is what pins the fixture placement.
@@ -118,11 +123,12 @@ def cmd_run(a):
                 for r in rs:
                     out = run_rollout(task, r, policy, res=a.res)
                     f.write(json.dumps(out) + "\n"); f.flush(); n += 1
-                    if n % 50 == 0:
+                    if n % step == 0 or n == len(rows):
                         el = time.time() - t0
-                        print(f"  {n}/{len(rows)}  {el/n:.1f}s each  "
-                              f"{(len(rows)-n)*el/n/60:.0f} min left",
-                              flush=True)
+                        left = (len(rows) - n) * el / n
+                        eta = f"{left/60:.0f} min left" if left >= 90 else f"{left:.0f} s left"
+                        print(f"  {n}/{len(rows)}  {100*n/len(rows):3.0f}%  "
+                              f"{el/n:.1f}s each  {eta}", flush=True)
         finally:
             close_task(task)
     print(f"done: {n} rollouts in {time.time()-t0:.0f}s -> {a.out}")
