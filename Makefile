@@ -21,6 +21,7 @@ paper:
 	@mkdir -p analysis/out
 	$(PY) analysis/gen_tab_decomp.py     > analysis/out/tab_decomp.tex
 	$(PY) analysis/fig_policy_profiles.py
+	$(PY) analysis/fig_axis_grid.py
 	$(PY) analysis/fig_composition.py
 	$(PY) analysis/aggregate.py
 	@echo "-> analysis/out/"

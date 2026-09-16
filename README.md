@@ -23,10 +23,21 @@ behind this grid, including those two.
 ## Results
 
 Seven policies, 0.54 M to 7.54 B parameters, were run over the whole design — 2,000 nominal plus
-8,400 perturbed rollouts each, 72,800 in total. Success rate in percent, `n = 400` per cell; the
-number after the policy is its nominal score over its 2,000 unperturbed rollouts, which is within
-1.9 points of the published aggregate for six of the seven checkpoints. Checkpoints and references
+8,400 perturbed rollouts each, 72,800 in total. One cell per policy and axis, `n = 400` per
+severity level: the dashed line is that policy's own nominal score over its 2,000 unperturbed
+rollouts — within 1.9 points of the published aggregate for six of the seven checkpoints — and the
+shaded area is what the axis takes away from it. Checkpoints and references
 are in `docs/POLICIES.md`, the raw per-rollout records in `results/paper/`.
+
+
+![Success rate by policy and axis, clean to L3](docs/figs/axis_grid.png)
+
+Grey marks MINERVA's language and combination cells: it resolves the instruction to an index in a
+fixed 40-task table, so a paraphrase is not an admissible input and the axis is the identity for it
+by construction. Regenerate with `python analysis/fig_axis_grid.py`.
+
+<details>
+<summary><b>The same numbers as a table</b></summary>
 
 | policy (params, nominal) | level | camera | lighting | robot | sensor | actuation | language | all six at once |
 |---|---|---:|---:|---:|---:|---:|---:|---:|
@@ -60,7 +71,9 @@ language sensitivity.
 steps at batch 32) and reaches 76.3% nominal against a published 87.3%; 76.3% is the reference
 score for *this checkpoint*, not a failed reproduction.
 
-Three things the table shows:
+</details>
+
+Three things this shows:
 
 - **Which axis hurts most is not shared.** UniVLA keeps 3.8% under camera L3 but 88.8% under
   lighting L3; MINERVA is the other way round — lighting takes it from 93.9% to 12.0% while camera
