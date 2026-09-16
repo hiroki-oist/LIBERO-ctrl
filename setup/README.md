@@ -25,8 +25,8 @@ The hours are measured, not estimated: the sum of the `wall_s` field over the pa
 for that policy, collected on two machines with 32 GB and 98 GB of GPU memory. Read them as the
 order of magnitude of the job rather than as a benchmark of your card.
 
-**The reduced benchmark.** `bash setup/small.sh <policy>` (or the `small` action of that policy's
-script) draws a random 1/20 of the design — 100 nominal and 420 perturbed rollouts — runs it, gates
+**The reduced benchmark.** `bash setup/small.sh <policy> [N]` (or the `small` action of that
+policy's script, which takes `N` the same way) draws a random 1/N of the design, 20 by default — 100 nominal and 420 perturbed rollouts — runs it, gates
 the nominal part with a ±10 point tolerance, and then prints the run's own axis × level table and
 writes its own compound decomposition to `out/<policy>_decomposition.png`: `S_indep`, `D`,
 `S_conj`, `I`, `S_sim` per level, with the disagreement split into emergent failures `R_e` and
@@ -35,9 +35,11 @@ compensated successes `R_c`.
 The draw is by **paired unit** — one `(suite, task, level, config)` holds the six single-axis
 rollouts and the simultaneous one on the same initial state — because `S_conj` is defined across
 that set and independent per-rollout sampling would destroy it at the same cost. It is unseeded, so
-two runs are two independent samples of the same design rather than the same rollouts twice;
-`SAMPLE=0.1` draws a tenth instead. At 1/20 a level rests on 20 units: a standard error of about 11
-points at 50%, enough for the shape and not for the decimals. `--shard i/N` splits either run by task across
+two runs are two independent samples of the same design rather than the same rollouts twice.
+`N` must divide 100, the paired units in each `(level, suite)` stratum — 1, 2, 4, 5, 10, 20, 25,
+50, 100 — and anything else is refused rather than silently weighting some strata above others. At
+1/20 a level rests on 20 units: a standard error of about 11 points at 50%, enough for the shape
+and not for the decimals. `--shard i/N` splits either run by task across
 processes. A re-run of the same command resumes, because already-written `rollout_id`s are
 skipped, so an interrupted job costs nothing.
 

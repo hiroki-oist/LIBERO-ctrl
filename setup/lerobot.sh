@@ -23,7 +23,7 @@ HOME_DIR=$ENVS/lerobot
 SRC=$HOME_DIR/MINERVA
 VENV=$SRC/.venv
 
-POLICY=${1:-}; ACTION=${2:-install}
+POLICY=${1:-}; ACTION=${2:-install}; DENOM_ARG=${3:-20}
 ROWS=()
 case "$POLICY" in
   pi05)    CKPT=lerobot/pi05-libero;      PUB=96.9;  CLEAN_H=4.8;  EVAL_H=19.6; EXTRA=() ;;
@@ -80,13 +80,13 @@ serve() {
 case "$ACTION" in
   install) install ;;
   serve)   serve; log "serving on $SOCK -- Ctrl-C to stop"; wait "$SRV_PID" ;;
-  small)   cost_note_small "$CLEAN_H" "$EVAL_H"; serve
+  small)   set_denominator "$DENOM_ARG"; cost_note_small "$CLEAN_H" "$EVAL_H"; serve
            run_split "$POLICY" "$SOCK" clean "$ROOT/out/${POLICY}_clean_small" --sample "$FRAC"
            run_split "$POLICY" "$SOCK" eval  "$ROOT/out/${POLICY}_eval_small"  --sample "$FRAC" ${ROWS[@]+"${ROWS[@]}"}
            gate_check "$ROOT/out/${POLICY}_clean_small" "$PUB" 10 \
              || warn "the gate did not pass on this sample -- the run continues, but read the numbers below with that in mind"
            summarise "$ROOT/out/${POLICY}_clean_small" "$ROOT/out/${POLICY}_eval_small"
-           decompose "$POLICY (1/$(awk -v f="$FRAC" 'BEGIN{printf "%.0f", 1/f}') of the design)" \
+           decompose "$POLICY (1/$DENOM of the design)" \
                      "$ROOT/out/${POLICY}_clean_small" "$ROOT/out/${POLICY}_eval_small" \
                      "$ROOT/out/${POLICY}_decomposition.png" ;;
   gate)    cost_note "$CLEAN_H" "$EVAL_H"; serve

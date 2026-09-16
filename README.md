@@ -38,10 +38,11 @@ Measured here: `make paper` 23 s, `make verify` 2 min.
 ```bash
 bash setup/ctrl.sh install              # once: LIBERO + robosuite + this package
 bash setup/lerobot.sh pi05 install      # that policy's environment and checkpoint
-bash setup/small.sh pi05                # 100 nominal + 420 perturbed rollouts
+bash setup/small.sh pi05                # 1/20 of the design: 100 + 420 rollouts
+bash setup/small.sh pi05 10             # 1/10 of it, if an hour was affordable
 ```
 
-| policy | install | short reproduction | short | full nominal | full perturbed |
+| policy | install | short reproduction (1/20) | short | full nominal | full perturbed |
 |---|---|---|---:|---:|---:|
 | π₀.₅ | `bash setup/lerobot.sh pi05 install` | `bash setup/small.sh pi05` | 1.2 h | 4.8 h | 19.6 h |
 | OpenVLA-OFT | `bash setup/oft.sh install` | `bash setup/small.sh oft` | 1.3 h | 4.5 h | 21.7 h |
@@ -59,11 +60,14 @@ bash setup/small.sh pi05                # 100 nominal + 420 perturbed rollouts
   carries the six single-axis rollouts and the simultaneous one on the same initial state.
   `S_conj` is defined across that set, so sampling rollouts independently would cost the same and
   lose it.
+- **Fraction.** The second argument is the `N` of `1/N`, default 20. It must divide 100, the
+  paired units in each `(level, suite)` stratum — 1, 2, 4, 5, 10, 20, 25, 50, 100 — and anything
+  else is refused rather than silently weighting some strata above others.
 - **Unseeded.** Two runs are two independent samples of the same design, not the same rollouts
-  twice. `SAMPLE=0.1` draws a tenth. The policy seed of a drawn rollout is still
-  `crc32(rollout_id)`.
-- **Precision.** 20 units per level and 20 rollouts per axis cell: a standard error near 11 points
-  at 50%. Signs and ordering reproduce; decimals do not.
+  twice. The policy seed of a drawn rollout is still `crc32(rollout_id)`.
+- **Precision.** At 1/20, 20 units per level and 20 rollouts per axis cell: a standard error near
+  11 points at 50%. Signs and ordering reproduce; decimals do not. The printed table and the
+  figure both state the standard error of the draw you actually made.
 - **Cost.** The hours are the recorded per-rollout wall time summed per policy, off two machines
   with 32 GB and 98 GB of GPU memory — the size of the job, not a measurement of your card. All
   seven policies came to 755 GPU-hours, which is what the 34 MB of records saves.

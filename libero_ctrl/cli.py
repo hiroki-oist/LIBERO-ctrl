@@ -69,7 +69,13 @@ def _subsample(rows, frac):
     out = []
     for stratum in sorted(strata):
         keys = strata[stratum]
-        n = max(1, min(len(keys), round(len(keys) * frac)))
+        exact = len(keys) * frac
+        if abs(exact - round(exact)) > 1e-9:
+            raise SystemExit(
+                f"--sample {frac} does not divide the design evenly: the {stratum} stratum holds "
+                f"{len(keys)} of them and {frac} of that is {exact:.3f}.\n"
+                f"  Use a fraction 1/N with N a divisor of {len(keys)}.")
+        n = max(1, int(round(exact)))
         for key in random.sample(keys, n):
             out += units[key]
     return sorted(out, key=lambda r: r["rollout_id"])
@@ -166,9 +172,10 @@ def main(argv=None):
                         "manifests/v0.1/minerva_recollect.jsonl is the eval design with the "
                         "canonical instruction, for a policy that cannot accept a paraphrase")
     r.add_argument("--sample", type=float, default=None, metavar="FRAC",
-                   help="run a random FRAC of the rows, stratified by (axis, level, suite). "
-                        "Unseeded: every run draws a different subset. 0.05 is the reduced "
-                        "benchmark -- 100 nominal and 420 perturbed rollouts")
+                   help="run a random FRAC of the design, drawn as whole paired units. "
+                        "Unseeded: every run draws a different subset. FRAC must divide each "
+                        "stratum exactly -- 1/N with N a divisor of 100. 0.05 is the reduced "
+                        "benchmark, 100 nominal and 420 perturbed rollouts")
     r.add_argument("--policy-kw", action="append", default=[], metavar="K=V",
                    help="constructor argument for the policy, e.g. sock_path=/tmp/oft_0.sock")
     r.set_defaults(f=cmd_run)

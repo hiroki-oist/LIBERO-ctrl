@@ -115,12 +115,25 @@ decompose() {  # decompose <name> <clean dir> <eval dir> <png>  -- the run's own
   "$CTRL_PY" "$ROOT/analysis/fig_run_decomposition.py" "$2" "$3" --name "$1" --out "$4"
 }
 
-# The reduced benchmark: a random 1/20 of every (axis, level, suite) cell, redrawn on every run.
-FRAC=${SAMPLE:-0.05}
+# The reduced benchmark: a random 1/N of the design, redrawn on every run. N defaults to 20 and
+# must divide 100, the number of paired units in each (level, suite) stratum -- a fraction that
+# does not divide the design exactly would silently give some strata more weight than others.
+DENOM=20
+FRAC=0.05
+
+set_denominator() {  # set_denominator [N]
+  DENOM=${1:-20}
+  case "$DENOM" in ""|*[!0-9]*) die "the denominator must be a positive integer, as in 1/20; got '$DENOM'";; esac
+  [ "$DENOM" -ge 1 ] || die "the denominator must be at least 1; got '$DENOM'"
+  [ $((100 % DENOM)) -eq 0 ] || die "1/$DENOM does not divide the design evenly.
+  Each (level, suite) stratum holds 100 paired units, so N has to be one of
+  1, 2, 4, 5, 10, 20, 25, 50, 100."
+  FRAC=$(awk -v n="$DENOM" 'BEGIN{printf "%.10g", 1/n}')
+}
 
 cost_note_small() {  # cost_note_small <clean hours> <eval hours>
-  warn "$(awk -v a="$1" -v b="$2" -v f="$FRAC" \
-          'BEGIN{printf "the reduced run is about %.1f h on one GPU (1/%.0f of the design)", (a+b)*f, 1/f}')"
+  warn "$(awk -v a="$1" -v b="$2" -v f="$FRAC" -v n="$DENOM" \
+          'BEGIN{printf "the reduced run is about %.1f h on one GPU (1/%d of the design)", (a+b)*f, n}')"
 }
 
 # Measured single-GPU wall time of the paper's own runs, from the wall_s field of
@@ -133,11 +146,11 @@ usage_common() {
   cat >&2 <<USAGE
 actions:
   install   create the environment, clone the upstream code, fetch the checkpoints
-  small     the reduced benchmark: a random 1/20 of the design, 100 + 420 rollouts, then print it
+  small [N] the reduced benchmark: a random 1/N of the design (default 20, so 100 + 420
+            rollouts), gated and then printed. N must divide 100
   gate      run the 2,000 nominal rollouts and check them against the published score
   eval      run the 8,400 perturbed rollouts
   serve     start the policy server only, and hold it open
 
-  SAMPLE=0.1 bash setup/... small    draw a tenth instead of a twentieth
 USAGE
 }
