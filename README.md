@@ -20,6 +20,68 @@ One task, one initial state, one configuration index. `actuation` and `language`
 the image and so are not in the figure; `docs/PERTURBATIONS.md` gives every parameter value
 behind this grid, including those two.
 
+## Results
+
+Seven policies, 0.54 M to 7.54 B parameters, were run over the whole design — 2,000 nominal plus
+8,400 perturbed rollouts each, 72,800 in total. Success rate in percent, `n = 400` per cell; the
+number after the policy is its nominal score over its 2,000 unperturbed rollouts, which is within
+1.9 points of the published aggregate for six of the seven checkpoints. Checkpoints and references
+are in `docs/POLICIES.md`, the raw per-rollout records in `results/paper/`.
+
+| policy (params, nominal) | level | camera | lighting | robot | sensor | actuation | language | all six at once |
+|---|---|---:|---:|---:|---:|---:|---:|---:|
+| **MINERVA**\* (0.54 M, 93.9) | L1 | 79.5 | 70.8 | 94.8 | 93.2 | 94.5 | 93.5 | 58.8 |
+|  | L2 | 56.2 | 38.8 | 89.2 | 94.5 | 93.8 | 93.2 | 18.5 |
+|  | L3 | 26.0 | 12.0 | 66.2 | 83.8 | 85.8 | 93.5 | 1.5 |
+| **PredVLA** (0.68 M, 79.3) | L1 | 73.0 | 78.2 | 73.0 | 79.2 | 80.0 | 1.8 | 1.2 |
+|  | L2 | 63.7 | 77.5 | 52.8 | 78.0 | 75.2 | 0.0 | 0.0 |
+|  | L3 | 63.0 | 76.8 | 25.8 | 67.2 | 62.7 | 0.2 | 0.2 |
+| **SmolVLA†** (450 M, 76.3) | L1 | 63.7 | 75.2 | 63.2 | 76.0 | 74.0 | 38.8 | 28.7 |
+|  | L2 | 44.8 | 73.5 | 46.0 | 75.5 | 72.2 | 28.7 | 10.0 |
+|  | L3 | 24.8 | 70.8 | 24.8 | 43.5 | 62.7 | 21.5 | 0.8 |
+| **VLA-JEPA** (2.77 B, 97.6) | L1 | 95.2 | 98.2 | 98.2 | 95.0 | 98.5 | 96.0 | 87.0 |
+|  | L2 | 85.5 | 98.2 | 92.5 | 72.0 | 96.0 | 94.8 | 44.2 |
+|  | L3 | 66.8 | 95.2 | 72.8 | 36.5 | 92.2 | 93.5 | 8.0 |
+| **π₀.₅** (4.14 B, 96.2) | L1 | 91.5 | 98.2 | 94.0 | 96.8 | 98.2 | 86.2 | 77.5 |
+|  | L2 | 80.8 | 98.0 | 87.5 | 97.0 | 96.2 | 79.8 | 50.2 |
+|  | L3 | 56.0 | 95.5 | 66.8 | 87.5 | 91.5 | 80.5 | 18.2 |
+| **OpenVLA-OFT** (7.54 B, 96.7) | L1 | 94.0 | 96.2 | 89.8 | 97.5 | 96.2 | 90.8 | 81.0 |
+|  | L2 | 87.5 | 95.2 | 75.2 | 97.0 | 95.2 | 90.0 | 57.8 |
+|  | L3 | 69.8 | 95.2 | 44.8 | 87.2 | 92.0 | 89.8 | 13.5 |
+| **UniVLA** (7.54 B, 93.9) | L1 | 63.7 | 93.2 | 90.5 | 93.5 | 95.8 | 87.5 | 46.5 |
+|  | L2 | 24.0 | 92.2 | 81.8 | 79.5 | 93.0 | 86.5 | 6.2 |
+|  | L3 | 3.8 | 88.8 | 52.5 | 20.0 | 86.0 | 88.5 | 0.0 |
+
+\*MINERVA resolves the instruction to an index in a fixed 40-task table, so a paraphrase is not an
+admissible input. Its language and combination cells are measured under the canonical instruction —
+the language axis is the identity for it by construction — and it is excluded from any claim about
+language sensitivity.
+†SmolVLA's released checkpoint is trained for an eighth of the published sample budget (25,000
+steps at batch 32) and reaches 76.3% nominal against a published 87.3%; 76.3% is the reference
+score for *this checkpoint*, not a failed reproduction.
+
+Three things the table shows:
+
+- **Which axis hurts most is not shared.** UniVLA keeps 3.8% under camera L3 but 88.8% under
+  lighting L3; MINERVA is the other way round — lighting takes it from 93.9% to 12.0% while camera
+  leaves 26.0%. OpenVLA-OFT's worst single axis at L3 is the robot initial pose (44.8%), not
+  camera (69.8%). A single robustness score would hide all of this.
+- **The language axis separates policies more sharply than any visual axis, and not by scale.**
+  At L3 the loss relative to a policy's own nominal score runs from 4.1 points (VLA-JEPA, 2.77 B)
+  to 54.8 (SmolVLA, 450 M) and 79.0 (PredVLA, 0.68 M). It is also approximately binary: only
+  SmolVLA degrades monotonically across L1–L3, the others take their whole loss at L1 and are then
+  flat (OpenVLA-OFT reads 90.8 / 90.0 / 89.8). A severity scale calibrated on geometry and
+  photometry does not transfer to text.
+- **The six axes at once cost more than any of them alone.** Combination L1 is already a longer
+  displacement in the normalised parameter space than any single-axis L3; at L3 no policy exceeds
+  18.2%, and for every policy the combination cell sits at or below its own worst single axis.
+  Whether that is a genuine interaction is exactly what the paired design is for: the conventional
+  compositionality residual turns out to conflate nominal-score normalisation, cross-axis survival
+  dependence and superposition, and it gets the sign of the last one wrong in both directions
+  (`analysis/`, Section 4 of the paper).
+
+---
+
 ## The design requirement
 
 **If you already have a working LIBERO evaluation loop, adopting LIBERO-CTRL should cost you
