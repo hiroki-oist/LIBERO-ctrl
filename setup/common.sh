@@ -99,10 +99,23 @@ run_split() {  # run_split <tag> <sock> <split> <outdir> [extra libero-ctrl args
     --split "$split" --res 256 --out "$out" "$@"
 }
 
-gate_check() {  # gate_check <outdir> <published aggregate>
+gate_check() {  # gate_check <outdir> <published aggregate> [tolerance in points]
   require_ctrl
   log "reproduction gate against a published $2%"
-  "$CTRL_PY" -m libero_ctrl.cli gate --results "$1" --published "$2"
+  "$CTRL_PY" -m libero_ctrl.cli gate --results "$1" --published "$2" ${3:+--tol "$3"}
+}
+
+summarise() {  # summarise <outdir...>  -- the run's own axis x level table
+  require_ctrl
+  "$CTRL_PY" "$ROOT/analysis/summarise_out.py" "$@"
+}
+
+# The reduced benchmark: a random 1/20 of every (axis, level, suite) cell, redrawn on every run.
+FRAC=${SAMPLE:-0.05}
+
+cost_note_small() {  # cost_note_small <clean hours> <eval hours>
+  warn "$(awk -v a="$1" -v b="$2" -v f="$FRAC" \
+          'BEGIN{printf "the reduced run is about %.1f h on one GPU (1/%.0f of the design)", (a+b)*f, 1/f}')"
 }
 
 # Measured single-GPU wall time of the paper's own runs, from the wall_s field of
@@ -115,8 +128,11 @@ usage_common() {
   cat >&2 <<USAGE
 actions:
   install   create the environment, clone the upstream code, fetch the checkpoints
+  small     the reduced benchmark: a random 1/20 of the design, 100 + 420 rollouts, then print it
   gate      run the 2,000 nominal rollouts and check them against the published score
   eval      run the 8,400 perturbed rollouts
   serve     start the policy server only, and hold it open
+
+  SAMPLE=0.1 bash setup/... small    draw a tenth instead of a twentieth
 USAGE
 }

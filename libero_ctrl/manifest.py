@@ -55,8 +55,15 @@ def env_seed() -> int:
     return int(protocol()["env_seed"])
 
 
-def load_rows(split: str = "eval") -> list[dict]:
-    path = os.path.join(_require_manifest(), SPLITS[split])
+def load_rows(split: str = "eval", path: str | None = None) -> list[dict]:
+    """The rows of a split, or of an explicit manifest file.
+
+    `path` exists for the policies a row can be inadmissible for. MINERVA resolves the
+    instruction to an index in a fixed table, so the paraphrased rows of `rollouts_eval.jsonl`
+    raise inside its processor; `minerva_recollect.jsonl` is the same 8,400 rows with the
+    canonical instruction on the language and combination axes, which is how the paper ran it.
+    """
+    path = path or os.path.join(_require_manifest(), SPLITS[split])
     with open(path) as f:
         rows = [json.loads(l) for l in f if l.strip()]
     for r in rows:
@@ -65,7 +72,7 @@ def load_rows(split: str = "eval") -> list[dict]:
 
 
 def iter_rows(split: str = "eval", *, axis=None, level=None, suite=None,
-              task_id=None) -> Iterator[dict]:
+              task_id=None, path=None) -> Iterator[dict]:
     """Manifest rows, filtered.
 
       iter_rows(axis="camera", level="L2")          ->   400 rows (one axis, one level)
@@ -77,7 +84,7 @@ def iter_rows(split: str = "eval", *, axis=None, level=None, suite=None,
         if want is None: return True
         want = {want} if isinstance(want, str) else set(want)
         return r.get(key) in want
-    for r in load_rows(split):
+    for r in load_rows(split, path):
         if (ok(r, "axis", axis) and ok(r, "level", level)
                 and ok(r, "suite", suite) and _ok_task(r, task_id)):
             yield r

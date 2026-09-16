@@ -47,26 +47,46 @@ bash setup/lerobot.sh pi05 gate            # 2,000 nominal rollouts, against the
 bash setup/lerobot.sh pi05 eval            # the 8,400 perturbed rollouts
 ```
 
-Six of the seven policies have a script; the seventh is not publicly distributed. The three
-`install` / `gate` / `eval` actions are the same for all of them, and the hours are measured — the
-sum of the `wall_s` field over the paper's own records for that policy, on a single GPU:
+Six of the seven policies have a script; the seventh is not publicly distributed. The
+`install` / `small` / `gate` / `eval` actions are the same for all of them:
 
-| policy | command | nominal gate | perturbed run |
-|---|---|---:|---:|
-| π₀.₅ | `bash setup/lerobot.sh pi05 <action>` | 4.8 h | 19.6 h |
-| OpenVLA-OFT | `bash setup/oft.sh <action>` | 4.5 h | 21.7 h |
-| UniVLA | `bash setup/univla.sh <action>` | 19.9 h | 159.2 h |
-| SmolVLA | `bash setup/lerobot.sh smolvla <action>` | 54.4 h | 294.4 h |
-| VLA-JEPA | `bash setup/lerobot.sh vlajepa <action>` | 5.4 h | 18.0 h |
-| MINERVA | `bash setup/lerobot.sh minerva <action>` | 2.5 h | 13.4 h |
+| policy | command | reduced run | full nominal | full perturbed |
+|---|---|---:|---:|---:|
+| π₀.₅ | `bash setup/lerobot.sh pi05 <action>` | 1.2 h | 4.8 h | 19.6 h |
+| OpenVLA-OFT | `bash setup/oft.sh <action>` | 1.3 h | 4.5 h | 21.7 h |
+| UniVLA | `bash setup/univla.sh <action>` | 9.0 h | 19.9 h | 159.2 h |
+| SmolVLA | `bash setup/lerobot.sh smolvla <action>` | 17.4 h | 54.4 h | 294.4 h |
+| VLA-JEPA | `bash setup/lerobot.sh vlajepa <action>` | 1.2 h | 5.4 h | 18.0 h |
+| MINERVA | `bash setup/lerobot.sh minerva <action>` | 0.8 h | 2.5 h | 13.4 h |
+
+The hours are measured, not estimated: the sum of the `wall_s` field over the paper's own records
+for that policy, collected on two machines with 32 GB and 98 GB of GPU memory. Read them as the
+order of magnitude of the job, not as a benchmark of your card. All seven together came to 755
+GPU-hours, about a month on one card — which is what the 34 MB of records saves you.
 
 `--shard i/N` splits either run by task across processes, and a re-run of the same command
 resumes: already-written `rollout_id`s are skipped, so an interrupted job costs nothing.
 `setup/README.md` has the prerequisites (`uv`, the Hugging Face CLI, ~120 GB of disk) and the trap
 each script encodes — the un-finetuned π₀.₅ base checkpoint that scores 0%, SmolVLA's required
-`--n_action_steps 1`, OpenVLA-OFT's 180° image rotation, UniVLA's per-suite checkpoints.
+`--n_action_steps 1`, OpenVLA-OFT's 180° image rotation, UniVLA's per-suite checkpoints, the
+manifest MINERVA has to be run with because it cannot accept a paraphrase.
 
-That table is what the 34 MB of records buys you: 755 GPU-hours, about a month on one card.
+### A twentieth of the design, in an hour
+
+```bash
+bash setup/small.sh pi05        # 100 nominal + 420 perturbed rollouts, then the table they make
+```
+
+`small` draws a random 1/20 of every `(axis, level, suite)` cell, runs it, gates the nominal part
+and prints the run's own axis × level table. The draw is **unseeded**: two runs are two
+independent samples of the same design rather than the same rollouts twice, and `SAMPLE=0.1` draws
+a tenth instead. The policy seed of a drawn rollout is still `crc32(rollout_id)`, so a rollout
+that turns up in both runs is the same rollout.
+
+A cell of 20 has a standard error of about 11 points at 50%, so a reduced run reproduces the
+*shape* — which axis is worst for this policy, how far the simultaneous condition falls below the
+single axes — and not the third digit. It is the cheap way to see whether the pipeline is wired up
+correctly before committing a week of GPU time to the full design.
 
 ## What is being measured
 

@@ -12,17 +12,25 @@ bash setup/lerobot.sh pi05 gate          # 2,000 nominal rollouts, checked again
 bash setup/lerobot.sh pi05 eval          # the 8,400 perturbed rollouts
 ```
 
-| policy | command | nominal gate | perturbed run |
-|---|---|---|---|
-| π₀.₅ | `setup/lerobot.sh pi05` | 4.8 h | 19.6 h |
-| SmolVLA | `setup/lerobot.sh smolvla` | 54.4 h | 294.4 h |
-| VLA-JEPA | `setup/lerobot.sh vlajepa` | 5.4 h | 18.0 h |
-| MINERVA | `setup/lerobot.sh minerva` | 2.5 h | 13.4 h |
-| OpenVLA-OFT | `setup/oft.sh` | 4.5 h | 21.7 h |
-| UniVLA | `setup/univla.sh` | 19.9 h | 159.2 h |
+| policy | command | reduced run | nominal gate | perturbed run |
+|---|---|---:|---:|---:|
+| π₀.₅ | `setup/lerobot.sh pi05` | 1.2 h | 4.8 h | 19.6 h |
+| SmolVLA | `setup/lerobot.sh smolvla` | 17.4 h | 54.4 h | 294.4 h |
+| VLA-JEPA | `setup/lerobot.sh vlajepa` | 1.2 h | 5.4 h | 18.0 h |
+| MINERVA | `setup/lerobot.sh minerva` | 0.8 h | 2.5 h | 13.4 h |
+| OpenVLA-OFT | `setup/oft.sh` | 1.3 h | 4.5 h | 21.7 h |
+| UniVLA | `setup/univla.sh` | 9.0 h | 19.9 h | 159.2 h |
 
-The hours are measured, not estimated: they are the sum of the `wall_s` field over the paper's own
-records for that policy, on a single GPU. `--shard i/N` splits either run by task across
+The hours are measured, not estimated: the sum of the `wall_s` field over the paper's own records
+for that policy, collected on two machines with 32 GB and 98 GB of GPU memory. Read them as the
+order of magnitude of the job rather than as a benchmark of your card.
+
+**The reduced benchmark.** `bash setup/small.sh <policy>` (or the `small` action of that policy's
+script) draws a random 1/20 of every `(axis, level, suite)` cell — 100 nominal and 420 perturbed
+rollouts — runs it, gates the nominal part with a ±10 point tolerance, and prints the run's own
+axis × level table. The draw is unseeded, so two runs are two independent samples of the same
+design rather than the same rollouts twice; `SAMPLE=0.1` draws a tenth instead. A cell of 20 has a
+standard error of about 11 points at 50%: it reproduces the shape, not the third digit. `--shard i/N` splits either run by task across
 processes. A re-run of the same command resumes, because already-written `rollout_id`s are
 skipped, so an interrupted job costs nothing.
 
@@ -84,8 +92,11 @@ sentence in a document:
 - **UniVLA** — `prismatic/__init__.py` is never imported; `univla.sh` copies the four modules the
   server needs into a minimal package. One checkpoint per suite, and the server is 15.6 GB
   resident.
-- **MINERVA** — resolves the instruction to an index in a fixed 40-task table, so a paraphrase
-  raises `KeyError`. It is evaluated on five axes with the canonical instruction.
+- **MINERVA** — resolves the instruction to an index in a fixed 40-task table, so a paraphrased
+  row raises `KeyError` inside its processor and takes the run down with it. Its script passes
+  `--rows manifests/v0.1/minerva_recollect.jsonl`, the same 8,400 rows with the canonical
+  instruction on the language and combination axes; the language axis is then the identity for it,
+  which is how the paper ran it and why it is reported on five axes.
 
 ## What these scripts do not pin
 

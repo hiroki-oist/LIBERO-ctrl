@@ -70,12 +70,12 @@ serve_suite() {  # serve_suite <suite>
       --sock "$RUNDIR/univla.sock" --suite "$1" --ckpt "$CKDIR/univla-libero-${1#libero_}"
 }
 
-by_suite() {  # by_suite <split> <outdir>
+by_suite() {  # by_suite <split> <outdir> [extra libero-ctrl args...]
   local s
   for s in "${SUITES[@]}"; do
     log "=== $s"
     serve_suite "$s"
-    run_split univla "$RUNDIR/univla.sock" "$1" "$2" --suite "$s"
+    run_split univla "$RUNDIR/univla.sock" "$1" "$2" --suite "$s" "${@:3}"
     stop_server
   done
 }
@@ -83,6 +83,11 @@ by_suite() {  # by_suite <split> <outdir>
 case "${1:-install}" in
   install) install ;;
   serve)   serve_suite "${2:?give a suite}"; log "serving -- Ctrl-C to stop"; wait "$SRV_PID" ;;
+  small)   cost_note_small "$CLEAN_H" "$EVAL_H"
+           by_suite clean "$ROOT/out/univla_clean_small" --sample "$FRAC"
+           by_suite eval  "$ROOT/out/univla_eval_small"  --sample "$FRAC"
+           gate_check "$ROOT/out/univla_clean_small" "$PUB" 10
+           summarise "$ROOT/out/univla_clean_small" "$ROOT/out/univla_eval_small" ;;
   gate)    cost_note "$CLEAN_H" "$EVAL_H"; by_suite clean "$ROOT/out/univla_clean"
            gate_check "$ROOT/out/univla_clean" "$PUB" ;;
   eval)    cost_note "$CLEAN_H" "$EVAL_H"; by_suite eval "$ROOT/out/univla_eval" ;;

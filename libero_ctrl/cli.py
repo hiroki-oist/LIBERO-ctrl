@@ -40,6 +40,25 @@ def _done_ids(out_dir: str) -> set:
     return got
 
 
+def _subsample(rows, frac):
+    """A random fraction of the design, stratified by (axis, level, suite).
+
+    Deliberately unseeded: every run draws a different subset, so two runs of the reduced
+    benchmark are two independent samples of the same design rather than the same rollouts
+    twice. The policy seed of a drawn rollout is still crc32(rollout_id), so a rollout that
+    appears in both runs is the same rollout.
+    """
+    import random
+    groups = defaultdict(list)
+    for r in rows:
+        groups[(r["axis"], r["level"], r["suite"])].append(r)
+    out = []
+    for key in sorted(groups):
+        g = groups[key]
+        out += random.sample(g, max(1, min(len(g), round(len(g) * frac))))
+    return sorted(out, key=lambda r: r["rollout_id"])
+
+
 def cmd_run(a):
     from .manifest import iter_rows
     from .env import make_task, close_task
@@ -47,10 +66,11 @@ def cmd_run(a):
 
     from .manifest import env_seed
     axis = None if a.axis in (None, "all") else a.axis.split(",")
-    rows = [r for r in iter_rows(a.split, axis=axis, level=a.level,
+    rows = [r for r in iter_rows(a.split, path=a.rows, axis=axis, level=a.level,
                                  suite=(a.suite.split(",") if a.suite else None),
                                  task_id=([int(x) for x in a.task.split(",")] if a.task else None))]
     if a.limit: rows = rows[:a.limit]
+    if a.sample: rows = _subsample(rows, a.sample)
     if a.shard:
         i, n = (int(x) for x in a.shard.split("/"))
         cells = sorted({(r["suite"], r["task_id"]) for r in rows})
@@ -125,6 +145,14 @@ def main(argv=None):
     r.add_argument("--shard", default=None, help="i/N; splits by task")
     r.add_argument("--task", default=None, help="0,1,2; restrict to these task ids")
     r.add_argument("--limit", type=int, default=None, help="first N rollouts only")
+    r.add_argument("--rows", default=None, metavar="PATH",
+                   help="a manifest file to use instead of the split's own; "
+                        "manifests/v0.1/minerva_recollect.jsonl is the eval design with the "
+                        "canonical instruction, for a policy that cannot accept a paraphrase")
+    r.add_argument("--sample", type=float, default=None, metavar="FRAC",
+                   help="run a random FRAC of the rows, stratified by (axis, level, suite). "
+                        "Unseeded: every run draws a different subset. 0.05 is the reduced "
+                        "benchmark -- 100 nominal and 420 perturbed rollouts")
     r.add_argument("--policy-kw", action="append", default=[], metavar="K=V",
                    help="constructor argument for the policy, e.g. sock_path=/tmp/oft_0.sock")
     r.set_defaults(f=cmd_run)

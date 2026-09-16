@@ -24,6 +24,7 @@ SRC=$HOME_DIR/MINERVA
 VENV=$SRC/.venv
 
 POLICY=${1:-}; ACTION=${2:-install}
+ROWS=()
 case "$POLICY" in
   pi05)    CKPT=lerobot/pi05-libero;      PUB=96.9;  CLEAN_H=4.8;  EVAL_H=19.6; EXTRA=() ;;
   smolvla) CKPT=lerobot/smolvla_libero;   PUB=76.35; CLEAN_H=54.4; EVAL_H=294.4
@@ -31,7 +32,12 @@ case "$POLICY" in
            # the LeRobot default in place silently evaluates a different policy.
            EXTRA=(--n_action_steps 1) ;;
   vlajepa) CKPT=lerobot/VLA-JEPA-LIBERO;  PUB=97.2;  CLEAN_H=5.4;  EVAL_H=18.0; EXTRA=() ;;
-  minerva) CKPT=$SRC/ckpt/t05_l1_0.54M;   PUB=95.75; CLEAN_H=2.5;  EVAL_H=13.4; EXTRA=() ;;
+  minerva) CKPT=$SRC/ckpt/t05_l1_0.54M;   PUB=95.75; CLEAN_H=2.5;  EVAL_H=13.4; EXTRA=()
+           # MINERVA resolves the instruction to an index in a fixed 40-task table, so a
+           # paraphrased row raises KeyError inside its processor. This manifest is the same
+           # 8,400 rows with the canonical instruction on the language and combination axes --
+           # the language axis is then the identity for it, which is how the paper ran it.
+           ROWS=(--rows "$ROOT/manifests/v0.1/minerva_recollect.jsonl") ;;
   *) echo "usage: bash setup/lerobot.sh <pi05|smolvla|vlajepa|minerva> <action>" >&2
      usage_common; exit 2 ;;
 esac
@@ -74,10 +80,15 @@ serve() {
 case "$ACTION" in
   install) install ;;
   serve)   serve; log "serving on $SOCK -- Ctrl-C to stop"; wait "$SRV_PID" ;;
+  small)   cost_note_small "$CLEAN_H" "$EVAL_H"; serve
+           run_split "$POLICY" "$SOCK" clean "$ROOT/out/${POLICY}_clean_small" --sample "$FRAC"
+           run_split "$POLICY" "$SOCK" eval  "$ROOT/out/${POLICY}_eval_small"  --sample "$FRAC" ${ROWS[@]+"${ROWS[@]}"}
+           gate_check "$ROOT/out/${POLICY}_clean_small" "$PUB" 10
+           summarise "$ROOT/out/${POLICY}_clean_small" "$ROOT/out/${POLICY}_eval_small" ;;
   gate)    cost_note "$CLEAN_H" "$EVAL_H"; serve
            run_split "$POLICY" "$SOCK" clean "$ROOT/out/${POLICY}_clean"
            gate_check "$ROOT/out/${POLICY}_clean" "$PUB" ;;
   eval)    cost_note "$CLEAN_H" "$EVAL_H"; serve
-           run_split "$POLICY" "$SOCK" eval "$ROOT/out/${POLICY}_eval" ;;
+           run_split "$POLICY" "$SOCK" eval "$ROOT/out/${POLICY}_eval" ${ROWS[@]+"${ROWS[@]}"} ;;
   *) usage_common; exit 2 ;;
 esac
