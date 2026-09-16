@@ -48,8 +48,9 @@ PredVLA is the seventh policy in the paper and is not here: its weights are not 
 ## What you need first
 
 - A CUDA GPU. The 7.5 B policies need about 16 GB to themselves; MINERVA needs a fraction of that.
-- [`uv`](https://docs.astral.sh/uv/) — `curl -LsSf https://astral.sh/uv/install.sh | sh`
-- The Hugging Face CLI — `uv tool install "huggingface_hub[cli]"`
+- [`uv`](https://docs.astral.sh/uv/) — `curl -LsSf https://astral.sh/uv/install.sh | sh`. That is
+  the only thing to install by hand: checkpoints are fetched with each policy's own environment,
+  which already depends on `huggingface_hub`.
 - About 120 GB of disk if you install every policy. The four OpenVLA-OFT checkpoints and the four
   UniVLA checkpoints are 7.5 B parameters each.
 

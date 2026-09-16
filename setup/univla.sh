@@ -53,8 +53,7 @@ install() {
 EOF
 
   log "downloading the four LIBERO checkpoints (7.5 B each)"
-  require_hf
-  "$HF" download "$CKPT_REPO" --local-dir "$CKDIR" >/dev/null
+  hf_download "$VENV/bin/python" "$CKPT_REPO" "$CKDIR" >/dev/null
   local s
   for s in "${SUITES[@]}"; do
     [ -d "$CKDIR/univla-libero-${s#libero_}" ] || die "missing $CKDIR/univla-libero-${s#libero_}"

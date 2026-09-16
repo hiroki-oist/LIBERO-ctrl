@@ -61,10 +61,9 @@ def __getattr__(name):
 EOF
 
   log "pre-fetching the four checkpoints (7.5 B each)"
-  require_hf
   local s
   for s in "${SUITES[@]}"; do
-    "$HF" download "moojink/openvla-7b-oft-finetuned-${s//_/-}" >/dev/null
+    hf_download "$VENV/bin/python" "moojink/openvla-7b-oft-finetuned-${s//_/-}" >/dev/null
   done
   log "done. OpenVLA-OFT is served from $VENV"
 }

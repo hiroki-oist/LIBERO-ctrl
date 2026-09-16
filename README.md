@@ -92,8 +92,8 @@ bash setup/univla.sh eval
 - **Per-policy traps**, each one a flag in its script rather than a sentence to remember: the
   un-finetuned π₀.₅ base checkpoint that scores 0%, SmolVLA's required `--n_action_steps 1`,
   OpenVLA-OFT's 180° image rotation, UniVLA's per-suite checkpoints, and the canonical-instruction
-  manifest MINERVA has to be run with. `setup/README.md` has them, with the prerequisites (`uv`,
-  the Hugging Face CLI, ~120 GB of disk).
+  manifest MINERVA has to be run with. `setup/README.md` has them, with the prerequisites — a CUDA
+  GPU, [`uv`](https://docs.astral.sh/uv/), and about 120 GB of disk if every policy is installed.
 
 ## Benchmark Design
 

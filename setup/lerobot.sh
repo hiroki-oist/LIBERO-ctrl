@@ -56,14 +56,10 @@ install() {
   log "installing (uv sync --locked, the lock file is what pins the renderer)"
   ( cd "$SRC" && uv sync -p 3.13 --locked --extra libero )
   "$VENV/bin/python" -c 'import mujoco; assert mujoco.__version__=="3.3.2", mujoco.__version__; import lerobot; print("lerobot ok")'
-  require_hf
   if [ "$POLICY" = minerva ]; then
-    log "downloading the MINERVA checkpoint"
-    ( cd "$SRC" && "$HF" download k1000dai/MINERVA --revision "$MINERVA_CKPT_REV" \
-        --include "t05_l1_0.54M/*" --local-dir ckpt )
+    hf_download "$VENV/bin/python" k1000dai/MINERVA "$SRC/ckpt" "t05_l1_0.54M/*" "$MINERVA_CKPT_REV"
   else
-    log "pre-fetching $CKPT"
-    "$HF" download "$CKPT" >/dev/null
+    hf_download "$VENV/bin/python" "$CKPT" >/dev/null
   fi
   log "done. $POLICY is served from $VENV"
 }

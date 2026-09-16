@@ -39,13 +39,27 @@ clone_at() {  # clone_at <url> <dir> <commit>
   log "$(basename "$dir") at $(git -C "$dir" rev-parse --short HEAD)"
 }
 
-HF=""
-require_hf() {  # the Hugging Face CLI, under whichever of its two names is installed
-  if have hf; then HF=hf
-  elif have huggingface-cli; then HF=huggingface-cli
-  else die "the Hugging Face CLI is missing. Install it with:
-    uv tool install \"huggingface_hub[cli]\""
-  fi
+# Checkpoints are fetched with the policy's own environment, which already has huggingface_hub:
+# every one of these stacks depends on it. Nothing has to be installed globally first, and the
+# download lands in the same cache the policy will read it from.
+hf_download() {  # hf_download <python> <repo id> [local dir] [include glob] [revision]
+  local py=$1 repo=$2 dir=${3:-} pat=${4:-} rev=${5:-}
+  [ -x "$py" ] || die "the policy environment is not built yet: $py"
+  log "fetching $repo${pat:+  ($pat)}${rev:+  @${rev:0:7}}"
+  "$py" - "$repo" "$dir" "$pat" "$rev" <<'PYEOF'
+import sys
+try:
+    from huggingface_hub import snapshot_download
+except ImportError:
+    sys.exit("huggingface_hub is missing from this environment, which should not happen: "
+             "every policy stack here depends on it. Reinstall the environment.")
+repo, local_dir, pattern, revision = sys.argv[1:5]
+kw = {}
+if local_dir: kw["local_dir"] = local_dir
+if pattern:   kw["allow_patterns"] = [pattern]
+if revision:  kw["revision"] = revision
+print(snapshot_download(repo, **kw))
+PYEOF
 }
 
 # --- server lifecycle -------------------------------------------------------------------
