@@ -34,21 +34,28 @@ that bounds how far the superposition effect `I` moves when three sampling polic
 `docs/RESULTS_INDEX.md` says what every run directory is and how the two collection machines were
 merged; `docs/RUNS.md` gives the exact command behind each one.
 
-### Re-collecting the rollouts instead of reading them
+### Running it yourself, on a twentieth of the design
 
 `setup/` takes a policy from nothing to a scored run — it clones the upstream code at the revision
 used here, builds that policy's own environment, downloads its checkpoint, starts its server and
-runs the benchmark against it.
+runs the benchmark against it. The reduced benchmark is the one to start with:
 
 ```bash
-bash setup/ctrl.sh install                 # once: LIBERO + robosuite + this package
-bash setup/lerobot.sh pi05 install         # that policy's environment and checkpoint
-bash setup/lerobot.sh pi05 gate            # 2,000 nominal rollouts, against the published score
-bash setup/lerobot.sh pi05 eval            # the 8,400 perturbed rollouts
+bash setup/ctrl.sh install           # once: LIBERO + robosuite + this package
+bash setup/lerobot.sh pi05 install   # that policy's environment and checkpoint
+bash setup/small.sh pi05             # 100 nominal + 420 perturbed rollouts, then the table they make
 ```
 
-Six of the seven policies have a script; the seventh is not publicly distributed. The
-`install` / `small` / `gate` / `eval` actions are the same for all of them:
+`small` draws a random 1/20 of every `(axis, level, suite)` cell, runs it, gates the nominal part
+and prints the run's own axis × level table. The draw is **unseeded**: two runs are two
+independent samples of the same design rather than the same rollouts twice, and `SAMPLE=0.1` draws
+a tenth instead. The policy seed of a drawn rollout is still `crc32(rollout_id)`, so a rollout that
+turns up in both runs is the same rollout.
+
+A cell of 20 has a standard error of about 11 points at 50%, so a reduced run reproduces the
+*shape* — which axis is worst for this policy, how far the simultaneous condition falls below the
+single axes — and not the third digit. An hour of GPU time is enough to see whether the pipeline is
+wired up correctly, and whether this benchmark says what it claims.
 
 | policy | command | reduced run | full nominal | full perturbed |
 |---|---|---:|---:|---:|
@@ -59,34 +66,29 @@ Six of the seven policies have a script; the seventh is not publicly distributed
 | VLA-JEPA | `bash setup/lerobot.sh vlajepa <action>` | 1.2 h | 5.4 h | 18.0 h |
 | MINERVA | `bash setup/lerobot.sh minerva <action>` | 0.8 h | 2.5 h | 13.4 h |
 
-The hours are measured, not estimated: the sum of the `wall_s` field over the paper's own records
-for that policy, collected on two machines with 32 GB and 98 GB of GPU memory. Read them as the
-order of magnitude of the job, not as a benchmark of your card. All seven together came to 755
-GPU-hours, about a month on one card — which is what the 34 MB of records saves you.
+Six of the seven policies have a script; the seventh is not publicly distributed. The hours are
+the per-rollout wall time recorded when the paper's runs were collected, summed per policy; they
+came off two machines with 32 GB and 98 GB of GPU memory, so read them as the size of the job
+rather than as a measurement of your card. All seven together came to 755 GPU-hours, about a month
+on one card — which is what the 34 MB of records saves you.
 
-`--shard i/N` splits either run by task across processes, and a re-run of the same command
-resumes: already-written `rollout_id`s are skipped, so an interrupted job costs nothing.
+### The full design
+
+```bash
+bash setup/lerobot.sh pi05 gate      # the 2,000 nominal rollouts, against the published score
+bash setup/lerobot.sh pi05 eval      # the 8,400 perturbed rollouts
+```
+
+`gate` first: before any perturbation number means anything, the adapter has to reproduce the
+*nominal* score of the checkpoint, and a failure there is almost always an observation-mapping
+problem rather than a robustness result. `--shard i/N` splits either run by task across processes,
+and a re-run of the same command resumes — already-written `rollout_id`s are skipped, so an
+interrupted job costs nothing.
+
 `setup/README.md` has the prerequisites (`uv`, the Hugging Face CLI, ~120 GB of disk) and the trap
 each script encodes — the un-finetuned π₀.₅ base checkpoint that scores 0%, SmolVLA's required
 `--n_action_steps 1`, OpenVLA-OFT's 180° image rotation, UniVLA's per-suite checkpoints, the
 manifest MINERVA has to be run with because it cannot accept a paraphrase.
-
-### A twentieth of the design, in an hour
-
-```bash
-bash setup/small.sh pi05        # 100 nominal + 420 perturbed rollouts, then the table they make
-```
-
-`small` draws a random 1/20 of every `(axis, level, suite)` cell, runs it, gates the nominal part
-and prints the run's own axis × level table. The draw is **unseeded**: two runs are two
-independent samples of the same design rather than the same rollouts twice, and `SAMPLE=0.1` draws
-a tenth instead. The policy seed of a drawn rollout is still `crc32(rollout_id)`, so a rollout
-that turns up in both runs is the same rollout.
-
-A cell of 20 has a standard error of about 11 points at 50%, so a reduced run reproduces the
-*shape* — which axis is worst for this policy, how far the simultaneous condition falls below the
-single axes — and not the third digit. It is the cheap way to see whether the pipeline is wired up
-correctly before committing a week of GPU time to the full design.
 
 ## What is being measured
 
