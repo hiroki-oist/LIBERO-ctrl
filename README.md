@@ -36,20 +36,37 @@ merged; `docs/RUNS.md` gives the exact command behind each one.
 
 ### Re-collecting the rollouts instead of reading them
 
-`setup/` takes a policy from nothing to a scored run in one command — it clones the upstream code
-at the revision used here, builds that policy's environment, downloads its checkpoint, starts its
-server and runs the benchmark:
+`setup/` takes a policy from nothing to a scored run — it clones the upstream code at the revision
+used here, builds that policy's own environment, downloads its checkpoint, starts its server and
+runs the benchmark against it.
 
 ```bash
-bash setup/ctrl.sh    install        # once: LIBERO + robosuite + this package
-bash setup/lerobot.sh pi05 install
-bash setup/lerobot.sh pi05 gate      # 2,000 nominal rollouts, checked against the published score
-bash setup/lerobot.sh pi05 eval      # the 8,400 perturbed rollouts
+bash setup/ctrl.sh install                 # once: LIBERO + robosuite + this package
+bash setup/lerobot.sh pi05 install         # that policy's environment and checkpoint
+bash setup/lerobot.sh pi05 gate            # 2,000 nominal rollouts, against the published score
+bash setup/lerobot.sh pi05 eval            # the 8,400 perturbed rollouts
 ```
 
-Six of the seven policies are covered; the seventh is not publicly distributed. The measured cost
-on a single GPU is 2.5 to 54 hours for a nominal run and 13 to 294 for a perturbed one, per policy
-— `setup/README.md` has the per-policy table. That is what the 34 MB of records buys you.
+Six of the seven policies have a script; the seventh is not publicly distributed. The three
+`install` / `gate` / `eval` actions are the same for all of them, and the hours are measured — the
+sum of the `wall_s` field over the paper's own records for that policy, on a single GPU:
+
+| policy | command | nominal gate | perturbed run |
+|---|---|---:|---:|
+| π₀.₅ | `bash setup/lerobot.sh pi05 <action>` | 4.8 h | 19.6 h |
+| OpenVLA-OFT | `bash setup/oft.sh <action>` | 4.5 h | 21.7 h |
+| UniVLA | `bash setup/univla.sh <action>` | 19.9 h | 159.2 h |
+| SmolVLA | `bash setup/lerobot.sh smolvla <action>` | 54.4 h | 294.4 h |
+| VLA-JEPA | `bash setup/lerobot.sh vlajepa <action>` | 5.4 h | 18.0 h |
+| MINERVA | `bash setup/lerobot.sh minerva <action>` | 2.5 h | 13.4 h |
+
+`--shard i/N` splits either run by task across processes, and a re-run of the same command
+resumes: already-written `rollout_id`s are skipped, so an interrupted job costs nothing.
+`setup/README.md` has the prerequisites (`uv`, the Hugging Face CLI, ~120 GB of disk) and the trap
+each script encodes — the un-finetuned π₀.₅ base checkpoint that scores 0%, SmolVLA's required
+`--n_action_steps 1`, OpenVLA-OFT's 180° image rotation, UniVLA's per-suite checkpoints.
+
+That table is what the 34 MB of records buys you: 755 GPU-hours, about a month on one card.
 
 ## What is being measured
 
