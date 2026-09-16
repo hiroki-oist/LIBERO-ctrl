@@ -11,7 +11,7 @@ evaluated. Where a policy ships a different checkpoint per suite, `<suite>` is o
 | UniVLA | 7.54 B | `qwbu/univla-7b-224-sft-libero` | `univla_server.py` | one checkpoint per suite; autoregressive latent actions rather than flow matching |
 | SmolVLA | 450 M | `lerobot/smolvla_libero` | `lerobot_server.py` | **`--n_action_steps 1` is required** |
 | VLA-JEPA | 2.77 B | `lerobot/VLA-JEPA-LIBERO` | `lerobot_server.py` | |
-| PredVLA | 0.68 M | *not distributed* | `pcvla_server.py` | the authors' own policy; the weights are not released, so this row cannot be reproduced from outside |
+| PredVLA | 0.68 M | — | `pcvla_server.py` | the checkpoint is not part of this release |
 | MINERVA | 0.54 M | `k1000dai/MINERVA`, `t05_l1_0.54M` | `lerobot_server.py` | no language encoder; five axes only |
 
 The training-seed variance section additionally uses three released MINERVA seeds,
@@ -27,8 +27,8 @@ Sources. The checkpoints above are on Hugging Face under the identifier given, e
 - **UniVLA** — code at <https://github.com/OpenDriveLab/UniVLA>; the LIBERO checkpoint repository
   holds one directory per suite, `univla-libero-{spatial,object,goal,10}`.
 - **OpenVLA-OFT** — code at <https://github.com/moojink/openvla-oft>.
-- **PredVLA** — not distributed. `pcvla_server.py` is kept because it documents the adapter, but
-  there is no checkpoint to point it at.
+- **PredVLA** — the checkpoint is not part of this release; `pcvla_server.py` is kept because it
+  documents the adapter.
 
 `setup/` turns every row of this table except PredVLA into one command: it clones the upstream
 code at the revision used here, builds the environment, fetches the checkpoint and runs the

@@ -71,7 +71,6 @@ bash setup/small.sh pi05 10             # 1/10 of it, if an hour was affordable
 - **Cost.** The hours are the recorded per-rollout wall time summed per policy, off two machines
   with 32 GB and 98 GB of GPU memory — the size of the job, not a measurement of your card. All
   seven policies came to 755 GPU-hours, which is what the 34 MB of records saves.
-- **Coverage.** Six of the seven policies; the seventh is not publicly distributed.
 
 ## Full Reproduction (10,400 Rollouts per Policy)
 

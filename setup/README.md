@@ -43,8 +43,6 @@ and not for the decimals. `--shard i/N` splits either run by task across
 processes. A re-run of the same command resumes, because already-written `rollout_id`s are
 skipped, so an interrupted job costs nothing.
 
-PredVLA is the seventh policy in the paper and is not here: its weights are not distributed.
-
 ## What you need first
 
 - A CUDA GPU. The 7.5 B policies need about 16 GB to themselves; MINERVA needs a fraction of that.
