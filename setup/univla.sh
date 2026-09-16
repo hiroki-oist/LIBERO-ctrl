@@ -33,8 +33,12 @@ install() {
   clone_at "$UNIVLA_URL" "$SRC" "$UNIVLA_REV"
   [ -x "$VENV/bin/python" ] || { log "creating the virtualenv (Python 3.10)"; uv venv --python 3.10 "$VENV"; }
   log "installing the inference dependencies"
+  # torch comes from the CUDA 12.8 index, not PyPI: the default wheel has no sm_120 kernels and
+  # dies at the first kernel launch on a Blackwell card. Override TORCH_INDEX for another CUDA.
+  VIRTUAL_ENV=$VENV uv pip install --index-url "${TORCH_INDEX:-https://download.pytorch.org/whl/cu128}" \
+    "torch==2.7.0" "torchvision"
   VIRTUAL_ENV=$VENV uv pip install \
-    "torch==2.7.0" "torchvision" "transformers==4.40.1" "tokenizers==0.19.1" "timm==0.9.10" \
+    "transformers==4.40.1" "tokenizers==0.19.1" "timm==0.9.10" \
     "numpy==1.26.4" "accelerate==1.14.0" "einops==0.8.2" "safetensors==0.8.0" \
     "sentencepiece==0.2.2" "huggingface_hub==0.36.2" "pillow"
 

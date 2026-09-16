@@ -27,7 +27,21 @@ install() {
   [ -x "$VENV/bin/python" ] || { log "creating the virtualenv (Python 3.10)"; uv venv --python 3.10 "$VENV"; }
   log "installing openvla-oft"
   VIRTUAL_ENV=$VENV uv pip install -e "$SRC"
-  VIRTUAL_ENV=$VENV uv pip install "torch==2.7.0" "transformers==4.40.1" "timm==0.9.10" "numpy==1.26.4"
+  # torch comes from the CUDA 12.8 index, not PyPI. The default wheel carries no sm_120 kernels,
+  # so on a Blackwell card it installs cleanly and then dies at the first kernel launch with
+  # "no kernel image is available for execution on the device". cu128 also covers older cards.
+  # Override TORCH_INDEX for a different CUDA version.
+  VIRTUAL_ENV=$VENV uv pip install --index-url "${TORCH_INDEX:-https://download.pytorch.org/whl/cu128}" \
+    "torch==2.7.0" "torchvision"
+  VIRTUAL_ENV=$VENV uv pip install "transformers==4.40.1" "timm==0.9.10" "numpy==1.26.4"
+  # prismatic imports its RLDS training pipeline at module level, which reaches
+  # tensorflow_datasets -> tensorflow_metadata -> protobuf. Left to resolve freely, pip picks a
+  # tensorflow_metadata built against protobuf 5 while TF 2.15 pins protobuf 4, and the import
+  # dies on `cannot import name 'runtime_version' from 'google.protobuf'`. These two are the
+  # versions the paper's environment had.
+  # wandb ships its protobuf stubs per protobuf major version and recent releases dropped the
+  # protobuf 3 ones, so it has to be pinned alongside. prismatic imports wandb at module level.
+  VIRTUAL_ENV=$VENV uv pip install "tensorflow-metadata==1.14.0" "protobuf==3.20.3" "wandb==0.16.6"
 
   # A stub for tensorflow_graphics.
   #

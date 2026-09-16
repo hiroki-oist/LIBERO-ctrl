@@ -53,8 +53,13 @@ install() {
   need_uv
   mkdir -p "$HOME_DIR"
   clone_at "$MINERVA_URL" "$SRC" "$MINERVA_REV"
+  # The four policies share this environment and `uv sync` reconciles it to exactly the extras
+  # it is given, so the union is selected once rather than one policy's dependencies being
+  # removed when the next is installed. Beyond `libero` they add four packages in total:
+  # diffusers and qwen-vl-utils (VLA-JEPA), num2words and accelerate (SmolVLA).
   log "installing (uv sync --locked, the lock file is what pins the renderer)"
-  ( cd "$SRC" && uv sync -p 3.13 --locked --extra libero )
+  ( cd "$SRC" && uv sync -p 3.13 --locked \
+      --extra libero --extra pi --extra smolvla --extra vla_jepa )
   "$VENV/bin/python" -c 'import mujoco; assert mujoco.__version__=="3.3.2", mujoco.__version__; import lerobot; print("lerobot ok")'
   if [ "$POLICY" = minerva ]; then
     hf_download "$VENV/bin/python" k1000dai/MINERVA "$SRC/ckpt" "t05_l1_0.54M/*" "$MINERVA_CKPT_REV"
