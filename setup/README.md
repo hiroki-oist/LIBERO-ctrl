@@ -114,6 +114,10 @@ server starts, binds its socket, loads its checkpoint and completes rollouts thr
 process (π₀.₅ at 4,143.40 M parameters with `n_action_steps=10`, SmolVLA at 450.05 M with
 `n_action_steps=1`, VLA-JEPA at 2,770.33 M, MINERVA, OpenVLA-OFT and UniVLA per suite).
 
+`small` has been run end to end for MINERVA on one RTX 5090: the reduced draw, both splits, the
+gate (PASS) and the printed table. Its perturbed rollouts came out at 4.7 s each against the 5.5 s
+in the archived records, so the hours in the table above transfer to a single card.
+
 `install` is reconstructed from the commands and pins the paper's environments were built with,
 and has not itself been re-run from an empty machine. If it fails for you, the failure is worth
 reporting: it is a defect in these scripts, not in your setup.
