@@ -1,6 +1,6 @@
 {
  "version": "v0.1",
- "note": "各 (軸, level, config) の物理量。params は正規化空間の方向 × unit × severity 倍率を物理単位で書いたもの、derived は人が読める換算。**camera / lighting / sensor はこれで説明が完結する**（画素変位や PSNR は補助情報で、--measure 時のみ付く）。actuation の EEF ずれだけは解析的に出せないので実測しキャッシュする。robot の IK 残差と衝突は solvability.json から読む（二重計算をしない）。",
+ "note": "The physical quantity behind each (axis, level, config). `params` is the direction in the normalised space times unit times the severity multiplier, written in physical units; `derived` is the human-readable conversion. Camera, lighting and sensor are fully described by this (pixel displacement and PSNR are auxiliary and are added only with --measure). Only the actuation axis's end-effector deviation cannot be derived analytically, so it is measured and cached. The robot axis's IK residual and collisions are read from the solvability survey rather than recomputed.",
  "severity_multipliers": {
   "L1": 2.0,
   "L2": 4.0,
@@ -23,7 +23,7 @@
     0.01947,
     0.01327
    ],
-   "anchor": "physical: 宣言した物理的範囲 / 8",
+   "anchor": "physical: the declared physical range / 8",
    "half_space": [
     2
    ],
@@ -545,7 +545,7 @@
     0.25,
     7.5
    ],
-   "anchor": "physical: 同上",
+   "anchor": "physical: as above",
    "half_space": [],
    "configs": {
     "c00": {
@@ -1213,7 +1213,7 @@
     0.415,
     0.75
    ],
-   "anchor": "physical: 宣言した物理的範囲 / 8",
+   "anchor": "physical: the declared physical range / 8",
    "half_space": [],
    "configs": {
     "c00": {
@@ -1667,7 +1667,7 @@
     0.0257,
     3.94
    ],
-   "anchor": "data: 50 init の EEF 平均ペア間距離",
+   "anchor": "data: the mean pairwise end-effector distance over 50 initial states",
    "half_space": [
     2
    ],
@@ -2249,7 +2249,7 @@
     0.32468,
     0.0235
    ],
-   "anchor": "physical: 実機の EEF 追従誤差 L1/L2/L3 = 10/20/40mm",
+   "anchor": "physical: end-effector tracking error on real hardware, L1/L2/L3 = 10/20/40 mm",
    "half_space": [
     3,
     4
@@ -3658,7 +3658,7 @@
      }
     }
    },
-   "measured_note": "★suite 別に記録する。開ループ再生の誤差は**デモ長に強く依存**し、デモ平均長は libero_spatial=92, libero_object=161, libero_goal=135, libero_10=337 と 3.7 倍違う。校正は libero_spatial で行っており、spatial では狙い（10/20/40mm）に一致する。libero_10 は L1 で既に 94mm に達し、レベル間の分離が 1.2 倍しかない。ただし**これは開ループ指標であり、評価は閉ループ**なので、実際の severity 分離は方策で測り直す必要がある。",
+   "measured_note": "Recorded per suite. The open-loop replay error depends strongly on demonstration length, and the mean demonstration length differs by a factor of 3.7 across the suites (libero_spatial 92, libero_object 161, libero_goal 135, libero_10 337). The calibration was done on libero_spatial, where the measurement matches the target of 10/20/40 mm. On libero_10 the L1 radius already reaches 94 mm and the separation between levels is only a factor of 1.2. This is an open-loop metric while the evaluation is closed-loop, so the effective separation in severity has to be re-measured with a policy.",
    "measured_protocol": {
     "demos_per_suite": 3,
     "tasks": [
@@ -3673,14 +3673,14 @@
      "libero_goal": 135.3,
      "libero_10": 336.7
     },
-    "metric": "デモ action の開ループ再生における EEF 軌道のずれ [mm]"
+    "metric": "end-effector trajectory deviation under open-loop replay of the demonstration actions [mm]"
    }
   },
   "language": {
    "keys": [],
    "unit": null,
-   "anchor": "入れ子(累積)構成: L1=語彙置換 / L2=+部分構造 / L3=+枠書き換え",
-   "note": "language は連続パラメータを持たない（入れ子構成で L1 ⊂ L2 ⊂ L3）。誘起量は 7 エンコーダで測った文埋め込み距離 d_lang の中央値で表す。",
+   "anchor": "nested (cumulative) construction: L1 = lexical substitution / L2 = + partial restructuring / L3 = + reframing",
+   "note": "The language axis has no continuous parameter (the construction is nested, L1 in L2 in L3). The induced quantity is reported as the median sentence-embedding distance d_lang, measured with seven encoders.",
    "per_suite": {
     "libero_spatial": {
      "median_d_lang_by_level": {

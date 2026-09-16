@@ -10,8 +10,8 @@
   },
   "num_steps_wait": 10,
   "env_seed": 20260904,
-  "env_seed_note": "★runner は env を **構築する直前** に random.seed(env_seed) と np.random.seed(env_seed) を呼ぶこと（lib_ctrl.seed_env）。LIBERO の 92次元 sim state には**静的 body（什器）の配置が入っていない**。state が持つのは可動物体の qpos/qvel だけで、棚・コンロ等は env 構築時に robosuite の配置サンプラが乱数で置く。サンプラは未シードなので、同じタスク・同じ init_id でも実行のたびに什器の位置と傾きが変わり （libero_spatial t7 で wooden_cabinet 8.5mm + 回転、flat_stove 7.6mm）、set_init_state では戻らない。固定しないと再現できない。実測は calibration/fixture_jitter.json",
-  "note": "max_steps は OpenVLA / LIBERO-PRO の suite ごとの値"
+  "env_seed_note": "The runner must call random.seed(env_seed) and np.random.seed(env_seed) IMMEDIATELY BEFORE constructing the env. LIBERO's 92-dimensional sim state does not contain the placement of the static bodies: it holds the qpos/qvel of the movable objects only, while shelves, stoves and the like are placed by robosuite's placement sampler at env construction. That sampler is unseeded, so the same task and the same init_id put the fixtures at a different position and tilt on every run (libero_spatial t7: wooden_cabinet 8.5 mm plus a rotation, flat_stove 7.6 mm), and set_init_state does not bring them back. Without this seeding the benchmark is not reproducible at all. Measured in the fixture-jitter survey, which is kept with the calibration surveys and is not part of this release.",
+  "note": "max_steps is the per-suite value used by OpenVLA and LIBERO-PRO."
  },
  "axes": {
   "camera": {
@@ -29,7 +29,7 @@
     0.01947,
     0.01327
    ],
-   "anchor": "physical: 宣言した物理的範囲 / 8",
+   "anchor": "physical: the declared physical range / 8",
    "half_space": [
     2
    ]
@@ -49,10 +49,10 @@
     0.25,
     7.5
    ],
-   "anchor": "physical: 同上",
+   "anchor": "physical: as above",
    "half_space": [],
    "shadow": false,
-   "note": "影なし（LIBERO 既定）。色は輝度保存の対数ゲイン（黒体軌跡ではない）"
+   "note": "No shadows (the LIBERO default). Colour is a luminance-preserving logarithmic gain, not a blackbody locus."
   },
   "robot": {
    "keys": [
@@ -63,11 +63,11 @@
     0.0257,
     3.94
    ],
-   "anchor": "data: 50 init の EEF 平均ペア間距離",
+   "anchor": "data: the mean pairwise end-effector distance over 50 initial states",
    "half_space": [
     2
    ],
-   "note": "6次元(位置3+姿勢3)。位置は unit[0]、姿勢は unit[1] でスケール"
+   "note": "Six-dimensional (3 position + 3 orientation). Position is scaled by unit[0], orientation by unit[1]."
   },
   "sensor": {
    "keys": [
@@ -82,7 +82,7 @@
     0.415,
     0.75
    ],
-   "anchor": "physical: 宣言した物理的範囲 / 8",
+   "anchor": "physical: the declared physical range / 8",
    "half_space": []
   },
   "actuation": {
@@ -100,7 +100,7 @@
     0.32468,
     0.0235
    ],
-   "anchor": "physical: 実機の EEF 追従誤差 L1/L2/L3 = 10/20/40mm",
+   "anchor": "physical: end-effector tracking error on real hardware, L1/L2/L3 = 10/20/40 mm",
    "half_space": [
     3,
     4
@@ -109,7 +109,7 @@
   "language": {
    "keys": [],
    "unit": [],
-   "anchor": "入れ子(累積)構成: L1=語彙置換 / L2=+部分構造 / L3=+枠書き換え",
+   "anchor": "nested (cumulative) construction: L1 = lexical substitution / L2 = + partial restructuring / L3 = + reframing",
    "half_space": []
   }
  },
@@ -121,12 +121,12 @@
  "eval": {
   "n_init": 10,
   "n_config": 10,
-  "mapping": "config j ↔ init slot j の 1:1"
+  "mapping": "config j <-> init slot j, one to one"
  },
  "finetune": {
   "n_init": 5,
   "n_config": 3,
-  "mapping": "init × config の直積"
+  "mapping": "the product of init x config"
  },
  "axis_directions": {
   "camera": [

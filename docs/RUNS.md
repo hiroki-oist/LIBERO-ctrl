@@ -21,7 +21,7 @@ libero-ctrl run --policy libero_ctrl.policy.remote:RemotePolicy \
 | `smolvla_{clean,eval}` | `lerobot_server.py` | **`--n_action_steps 1` is required** |
 | `vlajepa_{clean,eval}` | `lerobot_server.py` | `--ckpt lerobot/VLA-JEPA-LIBERO` |
 | `predvla_s13_{clean,eval}` | `pcvla_server.py` | seed 13 is the one the paper reports |
-| `minerva_{clean,eval}` | `minerva_server.py` | five axes only; canonical instruction |
+| `minerva_{clean,eval}` | `lerobot_server.py` | five axes only; canonical instruction |
 
 `--shard i/N` splits the work by `(suite, task)` across processes; rerunning the same command
 resumes, since already-written `rollout_id`s are skipped.
