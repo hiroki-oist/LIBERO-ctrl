@@ -34,7 +34,7 @@ install() {
   VIRTUAL_ENV=$VENV uv pip install -r "$HOME_DIR/LIBERO/requirements.txt"
   VIRTUAL_ENV=$VENV uv pip install -e "$HOME_DIR/LIBERO"
   # The renderer and the controller stack are pinned after LIBERO, which does not pin them.
-  VIRTUAL_ENV=$VENV uv pip install "robosuite==1.4.0" "mujoco==2.3.7" "numpy==1.26.4"
+  VIRTUAL_ENV=$VENV uv pip install "robosuite==1.4.0" "mujoco==2.3.7" "numpy==1.26.4" matplotlib
   log "installing libero_ctrl"
   VIRTUAL_ENV=$VENV uv pip install -e "$ROOT"
 

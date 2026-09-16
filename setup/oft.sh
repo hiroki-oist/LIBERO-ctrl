@@ -94,7 +94,10 @@ case "${1:-install}" in
            by_suite clean "$ROOT/out/oft_clean_small" --sample "$FRAC"
            by_suite eval  "$ROOT/out/oft_eval_small"  --sample "$FRAC"
            gate_check "$ROOT/out/oft_clean_small" "$PUB" 10
-           summarise "$ROOT/out/oft_clean_small" "$ROOT/out/oft_eval_small" ;;
+           summarise "$ROOT/out/oft_clean_small" "$ROOT/out/oft_eval_small"
+           decompose "OpenVLA-OFT (1/$(awk -v f="$FRAC" 'BEGIN{printf "%.0f", 1/f}') of the design)" \
+                     "$ROOT/out/oft_clean_small" "$ROOT/out/oft_eval_small" \
+                     "$ROOT/out/oft_decomposition.png" ;;
   gate)    cost_note "$CLEAN_H" "$EVAL_H"; by_suite clean "$ROOT/out/oft_clean"
            gate_check "$ROOT/out/oft_clean" "$PUB" ;;
   eval)    cost_note "$CLEAN_H" "$EVAL_H"; by_suite eval "$ROOT/out/oft_eval" ;;

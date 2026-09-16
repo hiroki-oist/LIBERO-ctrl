@@ -84,7 +84,10 @@ case "$ACTION" in
            run_split "$POLICY" "$SOCK" clean "$ROOT/out/${POLICY}_clean_small" --sample "$FRAC"
            run_split "$POLICY" "$SOCK" eval  "$ROOT/out/${POLICY}_eval_small"  --sample "$FRAC" ${ROWS[@]+"${ROWS[@]}"}
            gate_check "$ROOT/out/${POLICY}_clean_small" "$PUB" 10
-           summarise "$ROOT/out/${POLICY}_clean_small" "$ROOT/out/${POLICY}_eval_small" ;;
+           summarise "$ROOT/out/${POLICY}_clean_small" "$ROOT/out/${POLICY}_eval_small"
+           decompose "$POLICY (1/$(awk -v f="$FRAC" 'BEGIN{printf "%.0f", 1/f}') of the design)" \
+                     "$ROOT/out/${POLICY}_clean_small" "$ROOT/out/${POLICY}_eval_small" \
+                     "$ROOT/out/${POLICY}_decomposition.png" ;;
   gate)    cost_note "$CLEAN_H" "$EVAL_H"; serve
            run_split "$POLICY" "$SOCK" clean "$ROOT/out/${POLICY}_clean"
            gate_check "$ROOT/out/${POLICY}_clean" "$PUB" ;;

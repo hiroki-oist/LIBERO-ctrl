@@ -110,6 +110,11 @@ summarise() {  # summarise <outdir...>  -- the run's own axis x level table
   "$CTRL_PY" "$ROOT/analysis/summarise_out.py" "$@"
 }
 
+decompose() {  # decompose <name> <clean dir> <eval dir> <png>  -- the run's own Figure 4
+  require_ctrl
+  "$CTRL_PY" "$ROOT/analysis/fig_run_decomposition.py" "$2" "$3" --name "$1" --out "$4"
+}
+
 # The reduced benchmark: a random 1/20 of every (axis, level, suite) cell, redrawn on every run.
 FRAC=${SAMPLE:-0.05}
 

@@ -41,21 +41,37 @@ def _done_ids(out_dir: str) -> set:
 
 
 def _subsample(rows, frac):
-    """A random fraction of the design, stratified by (axis, level, suite).
+    """A random fraction of the design, drawn as whole paired units.
+
+    The unit is what the paired analysis needs to stay together: one `(suite, task, level,
+    config)` carries the six single-axis rollouts and the simultaneous one, all on the same
+    initial state, and the decomposition of Section 4 is computed across that set. Drawing
+    rollouts independently would give the same count and make S_conj -- "did this initial state
+    survive every axis on its own" -- uncomputable. Nominal rows have no such structure and are
+    drawn one at a time.
+
+    Units are stratified by (level, suite) so every level and every suite keeps its share.
 
     Deliberately unseeded: every run draws a different subset, so two runs of the reduced
     benchmark are two independent samples of the same design rather than the same rollouts
     twice. The policy seed of a drawn rollout is still crc32(rollout_id), so a rollout that
-    appears in both runs is the same rollout.
+    appears in both is the same rollout.
     """
     import random
-    groups = defaultdict(list)
+    units = defaultdict(list)
     for r in rows:
-        groups[(r["axis"], r["level"], r["suite"])].append(r)
+        key = ((r["suite"], r["task_id"], r["level"], r["config"]) if r["axis"] != "clean"
+               else (r["suite"], r["task_id"], r["level"], r["init_id"]))
+        units[key].append(r)
+    strata = defaultdict(list)
+    for key in units:
+        strata[(key[2], key[0])].append(key)          # (level, suite)
     out = []
-    for key in sorted(groups):
-        g = groups[key]
-        out += random.sample(g, max(1, min(len(g), round(len(g) * frac))))
+    for stratum in sorted(strata):
+        keys = strata[stratum]
+        n = max(1, min(len(keys), round(len(keys) * frac)))
+        for key in random.sample(keys, n):
+            out += units[key]
     return sorted(out, key=lambda r: r["rollout_id"])
 
 

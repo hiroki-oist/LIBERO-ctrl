@@ -46,16 +46,26 @@ bash setup/lerobot.sh pi05 install   # that policy's environment and checkpoint
 bash setup/small.sh pi05             # 100 nominal + 420 perturbed rollouts, then the table they make
 ```
 
-`small` draws a random 1/20 of every `(axis, level, suite)` cell, runs it, gates the nominal part
-and prints the run's own axis × level table. The draw is **unseeded**: two runs are two
-independent samples of the same design rather than the same rollouts twice, and `SAMPLE=0.1` draws
-a tenth instead. The policy seed of a drawn rollout is still `crc32(rollout_id)`, so a rollout that
-turns up in both runs is the same rollout.
+`small` draws a random 1/20 of the design, runs it, gates the nominal part, and ends by printing
+**your own version of the paper's two results**: the axis × level table, and the compound
+decomposition — `S_indep`, `D`, `S_conj`, `I`, `S_sim` per severity level, with the disagreement
+between the conjunction and the simultaneous condition split into emergent failures `R_e` and
+compensated successes `R_c`, written to `out/<policy>_decomposition.png`.
 
-A cell of 20 has a standard error of about 11 points at 50%, so a reduced run reproduces the
-*shape* — which axis is worst for this policy, how far the simultaneous condition falls below the
-single axes — and not the third digit. An hour of GPU time is enough to see whether the pipeline is
-wired up correctly, and whether this benchmark says what it claims.
+What it draws is a random 1/20 of the **paired units**: one `(suite, task, level, config)` carries
+the six single-axis rollouts and the simultaneous one, all from the same initial state, and the
+decomposition is computed across that set. Sampling rollouts independently would cost the same and
+leave `S_conj` — did this initial state survive every axis on its own — uncomputable. The draw is
+**unseeded**: two runs are two independent samples of the same design rather than the same rollouts
+twice, and `SAMPLE=0.1` draws a tenth instead. The policy seed of a drawn rollout is still
+`crc32(rollout_id)`, so a rollout that turns up in both runs is the same rollout.
+
+At 1/20 each level rests on 20 paired units and each axis cell on 20 rollouts, a standard error of
+about 11 points at 50%. A reduced run therefore reproduces the *shape* — which axis is worst for
+this policy, whether `D` is positive, whether `I` turns negative as severity rises — and not the
+decimals. An hour of GPU time is enough to see whether the pipeline is wired up correctly and
+whether this benchmark says what it claims; `analysis/fig_run_decomposition.py` redraws the figure
+from any run directory, including a full one.
 
 | policy | command | reduced run | full nominal | full perturbed |
 |---|---|---:|---:|---:|
