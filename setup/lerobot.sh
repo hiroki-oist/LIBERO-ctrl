@@ -83,7 +83,8 @@ case "$ACTION" in
   small)   cost_note_small "$CLEAN_H" "$EVAL_H"; serve
            run_split "$POLICY" "$SOCK" clean "$ROOT/out/${POLICY}_clean_small" --sample "$FRAC"
            run_split "$POLICY" "$SOCK" eval  "$ROOT/out/${POLICY}_eval_small"  --sample "$FRAC" ${ROWS[@]+"${ROWS[@]}"}
-           gate_check "$ROOT/out/${POLICY}_clean_small" "$PUB" 10
+           gate_check "$ROOT/out/${POLICY}_clean_small" "$PUB" 10 \
+             || warn "the gate did not pass on this sample -- the run continues, but read the numbers below with that in mind"
            summarise "$ROOT/out/${POLICY}_clean_small" "$ROOT/out/${POLICY}_eval_small"
            decompose "$POLICY (1/$(awk -v f="$FRAC" 'BEGIN{printf "%.0f", 1/f}') of the design)" \
                      "$ROOT/out/${POLICY}_clean_small" "$ROOT/out/${POLICY}_eval_small" \

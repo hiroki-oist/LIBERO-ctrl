@@ -86,7 +86,8 @@ case "${1:-install}" in
   small)   cost_note_small "$CLEAN_H" "$EVAL_H"
            by_suite clean "$ROOT/out/univla_clean_small" --sample "$FRAC"
            by_suite eval  "$ROOT/out/univla_eval_small"  --sample "$FRAC"
-           gate_check "$ROOT/out/univla_clean_small" "$PUB" 10
+           gate_check "$ROOT/out/univla_clean_small" "$PUB" 10 \
+             || warn "the gate did not pass on this sample -- the run continues, but read the numbers below with that in mind"
            summarise "$ROOT/out/univla_clean_small" "$ROOT/out/univla_eval_small"
            decompose "UniVLA (1/$(awk -v f="$FRAC" 'BEGIN{printf "%.0f", 1/f}') of the design)" \
                      "$ROOT/out/univla_clean_small" "$ROOT/out/univla_eval_small" \

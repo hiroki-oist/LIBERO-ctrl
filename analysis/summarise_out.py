@@ -38,6 +38,7 @@ def main(dirs):
         sr, n = rate(clean)
         print(f"\nnominal: {sr:.1f}%  (n={n})")
     perturbed = [r for r in rows if r["axis"] != "clean"]
+    cell_n = 0
     if perturbed:
         print(f"\n{'axis':<12}" + "".join(f"{L:>14}" for L in LEVELS))
         print("-" * (12 + 14 * len(LEVELS)))
@@ -46,10 +47,15 @@ def main(dirs):
             for L in LEVELS:
                 sr, n = rate([r for r in perturbed if r["axis"] == ax and r["level"] == L])
                 cells.append("-" if sr is None else f"{sr:.1f}% ({n})")
+                if n: cell_n = min(cell_n, n) if cell_n else n
             if any(c != "-" for c in cells):
                 print(f"{ax:<12}" + "".join(f"{c:>14}" for c in cells))
-    print(f"\n{len(rows)} rollouts. A cell of 20 has a standard error of about 11 points at 50%: "
-          "this reproduces the shape, not the third digit.\n")
+    if cell_n:
+        print(f"\n{len(rows)} rollouts. A cell of {cell_n} has a standard error of about "
+              f"{50 / cell_n ** 0.5:.0f} points at 50%: this reproduces the shape, not the "
+              "third digit.\n")
+    else:
+        print(f"\n{len(rows)} rollouts.\n")
 
 
 if __name__ == "__main__":
