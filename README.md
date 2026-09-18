@@ -14,6 +14,18 @@ Every rollout is **paired**: the same task, the same initial state, the same pol
 without the perturbation. That is what makes the three-term decomposition of
 Section 4 of the paper possible.
 
+## Adopting it costs two lines, five hooks, or two methods
+
+| you already have | you write | |
+|---|---|---|
+| nothing | a class with two methods | [**Implementation 1**](#implementation-1--two-methods-and-the-cli-drives) |
+| a LIBERO evaluation loop | 2 changed lines | [**Implementation 2**](#implementation-2--two-lines) |
+| your own harness — vectorised env, custom renderer | 5 hook calls | [**Implementation 3**](#implementation-3--five-hooks) |
+
+All three read the same manifest, so they produce identical rollouts. Nothing in your LIBERO
+install is touched. One command per policy reproduces the paper's own runs; a twentieth of the
+design takes about an hour.
+
 ![Each axis at each severity level](docs/figs/perturbation_grid_paper.png)
 
 One task, one initial state, one configuration index: `libero_object` task 2, initial state 23,
@@ -135,14 +147,6 @@ Three things this shows:
 
 ---
 
-## The design requirement
-
-**If you already have a working LIBERO evaluation loop, adopting LIBERO-CTRL should cost you
-two lines.** Everything below is built around that constraint. Three implementations are
-provided, easiest first: the first writes two methods and lets us drive, the second changes two
-lines of an evaluation loop you already have, and the third keeps your harness entirely and
-inserts five hooks into it.
-
 ---
 
 ## Install
@@ -152,23 +156,18 @@ git clone git@github.com:hiroki-oist/LIBERO-ctrl.git && cd LIBERO-ctrl
 pip install -e .        # into the SAME environment your LIBERO evaluation already runs in
 ```
 
-`pip install -e .` deliberately does **not** pull in `robosuite` or `mujoco`. You are assumed to
-already have a LIBERO environment that works; installing this package must not change its
-versions. The reference environment for the paper is `robosuite 1.4.0` / `mujoco 2.3.7` /
-Python 3.10.
-
-The manifests live outside the Python package (`manifests/v0.1/`), because they *are* the
-experiment design and should be readable without unpacking a wheel. The editable install above
-finds them automatically; otherwise set `LIBERO_CTRL_MANIFEST=/path/to/manifests/v0.1`.
+No `robosuite` or `mujoco` dependency: your working LIBERO install is not touched. Reference
+environment: `robosuite 1.4.0` / `mujoco 2.3.7` / Python 3.10. The manifests sit outside the
+package in `manifests/v0.1/`; `LIBERO_CTRL_MANIFEST` points elsewhere.
 
 ---
 
-## Implementation 1 — write a two-method policy, and let the CLI drive
+## Implementation 1 — two methods, and the CLI drives
 
 ```python
 class MyPolicy:
     def reset(self, language: str, *, seed: int) -> None: ...
-    def act(self, agentview, wrist, obs) -> np.ndarray: ...   # (H,W,3) uint8, raw robosuite orientation
+    def act(self, agentview, wrist, obs) -> np.ndarray: ...   # (H,W,3) uint8
 ```
 
 ```bash
@@ -179,42 +178,32 @@ libero-ctrl run --policy mymod:MyPolicy --split eval            --out out/      
 libero-ctrl gate --results out/ --published 97.1                                # reproduction gate
 ```
 
-`--shard i/N` splits by task for multi-GPU runs, and a re-run of the same command resumes:
-already-written `rollout_id`s are skipped, so an interrupted job costs nothing.
-
-**Image orientation is your responsibility.** Images are handed to `act()` in the raw robosuite
-orientation (OpenGL, bottom-up), which is the orientation LIBERO's own demonstration HDF5 files
-use (measured: mean absolute difference 7.4 against the demos, versus 55.6 if flipped). Different
-released checkpoints expect different conventions — OpenVLA-OFT wants a 180° rotation — so the
-benchmark does not guess. Convert inside your adapter.
-
-### Policies that cannot share a process
-
-Five of the seven policies in the paper need mutually incompatible stacks (Python 3.10 vs 3.13,
-MuJoCo 2.3.7 vs 3.3.2). `examples/servers/` contains the unix-socket servers used for the paper;
-the wire format (`libero_ctrl/policy/wire.py`) is length-prefixed JSON + raw array bytes, never
-pickle, exactly so the two sides can disagree about their numpy version.
+- Images arrive in the raw robosuite orientation, the one LIBERO's own demonstrations are stored
+  in. Checkpoints disagree — OpenVLA-OFT wants a 180° rotation — so the benchmark does not guess:
+  convert inside `act()`.
+- `--shard i/N` splits by task; a re-run resumes, skipping written `rollout_id`s.
+- If your policy cannot share a process with LIBERO, run it in its own venv behind a unix socket
+  (`examples/servers/`, length-prefixed JSON, never pickle):
 
 ```bash
-# terminal 1 — in the policy's own venv
-python examples/servers/oft_server.py --sock /tmp/oft.sock --suite libero_spatial
-# terminal 2 — in your LIBERO venv
+python examples/servers/oft_server.py --sock /tmp/oft.sock --suite libero_spatial   # its venv
 libero-ctrl run --policy libero_ctrl.policy.remote:RemotePolicy \
-                --policy-kw sock_path=/tmp/oft.sock --split clean --suite libero_spatial --out out/
+                --policy-kw sock_path=/tmp/oft.sock --split clean --out out/        # your venv
 ```
 
-### Running one of the paper's policies from scratch
+Example: `examples/01_policy_adapter.py`.
 
-`setup/` does the whole of that for you, one command per policy: it clones the upstream code at
-the revision used here, builds its environment, downloads its checkpoint, starts its server, and
-runs the benchmark against it. `uv` is the only prerequisite.
+### Reproducing one of the paper's policies
+
+`uv` is the only prerequisite. Each script clones the upstream code at the revision used here,
+builds its environment, downloads its checkpoint, starts its server and runs the benchmark.
 
 ```bash
 bash setup/ctrl.sh install              # once: LIBERO + robosuite + this package
 bash setup/lerobot.sh pi05 install      # that policy's environment and checkpoint
 bash setup/small.sh pi05                # 1/20 of the design: 100 + 420 rollouts, ~1 h
-bash setup/lerobot.sh pi05 gate         # the full 2,000 nominal rollouts, against the published score
-bash setup/lerobot.sh pi05 eval         # the full 8,400 perturbed rollouts
+bash setup/lerobot.sh pi05 gate         # the full 2,000 nominal, against the published score
+bash setup/lerobot.sh pi05 eval         # the full 8,400 perturbed
 ```
 
 | policy | install | short reproduction | short | full nominal | full perturbed |
@@ -226,28 +215,18 @@ bash setup/lerobot.sh pi05 eval         # the full 8,400 perturbed rollouts
 | VLA-JEPA | `bash setup/lerobot.sh vlajepa install` | `bash setup/small.sh vlajepa` | 1.2 h | 5.4 h | 18.0 h |
 | MINERVA | `bash setup/lerobot.sh minerva install` | `bash setup/small.sh minerva` | 0.8 h | 2.5 h | 13.4 h |
 
-**Start with `small.sh`.** It draws a random 1/20 of the design — whole *paired units*, one
-`(suite, task, level, config)` carrying the six single-axis rollouts and the simultaneous one on
-the same initial state — runs it, gates the nominal part, and prints that run's own axis × level
-table and its own compound decomposition (`S_indep`, `D`, `S_conj`, `I`, `S_sim`, with the
-disagreement split into emergent failures `R_e` and compensated successes `R_c`) into
-`out/<policy>_decomposition.png`. The draw is unseeded, so two runs are two independent samples
-rather than the same rollouts twice, and `bash setup/small.sh pi05 10` draws a tenth instead; `N`
-must divide 100. At 1/20 a level rests on 20 units, a standard error near 11 points at 50%: the
-shape reproduces, the decimals do not.
+- `small.sh` prints that run's own axis × level table and its own decomposition figure
+  (`out/<policy>_decomposition.png`). `bash setup/small.sh pi05 10` draws a tenth; `N` divides 100.
+- It draws whole paired units, so `S_conj` stays computable, and the draw is unseeded: two runs
+  are two independent samples. At 1/20 a level rests on 20 units — the shape reproduces, the
+  decimals do not.
+- The hours are the recorded wall time of the paper's own runs, summed: the size of the job, not a
+  measurement of your card.
+- `setup/README.md` lists the trap each script encodes.
 
-The hours are the per-rollout wall time recorded when the paper's runs were collected, summed per
-policy, so read them as the size of the job rather than a measurement of your card. `--shard i/N`
-splits a full run by task across processes, and a re-run resumes: already-written `rollout_id`s
-are skipped. `setup/README.md` lists the trap each script encodes — the un-finetuned π₀.₅ base
-checkpoint that scores 0%, SmolVLA's required `--n_action_steps 1`, OpenVLA-OFT's 180° image
-rotation, the CUDA 12.8 torch build that a Blackwell card needs, the canonical-instruction
-manifest MINERVA has to be run with.
+---
 
-Running example: `python -m libero_ctrl.cli run --policy 01_policy_adapter:MyPolicy ...`
-(the file is `examples/01_policy_adapter.py`).
-
-## Implementation 2 — swap the benchmark object (2 lines)
+## Implementation 2 — two lines
 
 ```diff
 - from libero.libero import benchmark
@@ -263,9 +242,8 @@ Running example: `python -m libero_ctrl.cli run --policy 01_policy_adapter:MyPol
       obs, r, done, info = env.step(policy(obs, task.language))
 ```
 
-The index `i` now enumerates `(task × axis × level × config × initial state)` instead of the ten
-LIBERO tasks; `bm.indices(axis=..., level=..., task_id=...)` narrows it. `CtrlEnv` applies every
-perturbation internally:
+`i` now enumerates `(task × axis × level × config × initial state)`; `bm.indices(axis=...,
+level=...)` narrows it. `CtrlEnv` applies every perturbation internally:
 
 | axis | where it is applied |
 |---|---|
@@ -275,17 +253,11 @@ perturbation internally:
 | actuation | the action passed to `step()` is transformed |
 | language | `task.language` already contains the perturbed instruction |
 
-Running example: `python examples/02_dropin.py`.
+Example: `examples/02_dropin.py`.
 
-**Why not just ship perturbed BDDL files?** LIBERO-Plus can express its perturbations as scene
-definitions. Two of ours cannot be written in BDDL even in principle: `sensor` degrades the
-observation after rendering, and `actuation` perturbs the action on its way to the controller.
-An env wrapper is the smallest surface that covers all seven axes.
+---
 
-## Implementation 3 — keep your own loop, add five hooks
-
-If you have a parallel harness, a custom renderer or a vectorised env, you do not have to adopt
-our env at all. Five call sites are the entire contract:
+## Implementation 3 — five hooks
 
 ```python
 p = build(PerturbSpec.from_row(row), suite=row["suite"], shape=(H, W))
@@ -297,8 +269,8 @@ a   = p.transform_action(a)                       # 5. actuation
 policy.reset(row["language"], seed=row["seed"])   #    language is just this string
 ```
 
-Running example: `python examples/03_hooks.py`.
-
+Nothing else is required: how the env is built, how it is rendered and how the loop is scheduled
+stay yours. Example: `examples/03_hooks.py`.
 
 ---
 

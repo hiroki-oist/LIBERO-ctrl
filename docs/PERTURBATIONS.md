@@ -14,6 +14,11 @@ across as well as down. Within a level the ten configurations are *directions* o
 sphere; configuration 0 is shown here, and a different configuration moves the same
 distance a different way.
 
+**Why an env wrapper rather than perturbed BDDL files?** LIBERO-Plus can express its
+perturbations as scene definitions. Two of ours cannot be written in BDDL even in principle:
+`sensor` degrades the observation after rendering, and `actuation` perturbs the action on its way
+to the controller.
+
 Two of the seven axes do not change the image and are therefore absent from the figure.
 `actuation` transforms the action on its way to the controller, and `language` replaces
 the instruction. Both are given in full below.
