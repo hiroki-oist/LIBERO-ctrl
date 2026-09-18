@@ -1,14 +1,20 @@
 """LIBERO-CTRL: a controlled, paired, severity-calibrated robustness benchmark for VLA policies.
 
-Three ways in, depending on how much evaluation code you already have.
+Three implementations, easiest first, depending on how much evaluation code you already have.
 
-  Level 0 -- swap the benchmark object (2 lines changed):
+  Implementation 1 -- write a two-method policy and let us drive:
+      class MyPolicy:
+          def reset(self, language: str, *, seed: int) -> None: ...
+          def act(self, agentview, wrist, obs) -> np.ndarray: ...
+      $ libero-ctrl run --policy mymodule:MyPolicy --axis camera --level L2
+
+  Implementation 2 -- swap the benchmark object (2 lines changed):
       from libero_ctrl import get_benchmark_dict
       bm = get_benchmark_dict(split="eval")["libero_ctrl_spatial"]()
       env = bm.make_env(i, camera_heights=256, camera_widths=256)
       # your existing loop over bm.get_task(i) / env.step(...) keeps working
 
-  Level 1 -- keep your own loop, insert five hooks:
+  Implementation 3 -- keep your own loop, insert five hooks:
       from libero_ctrl import PerturbSpec, build, iter_rows
       p = build(PerturbSpec.from_row(row), suite=row["suite"], shape=(128,128))
       p.reset(row["seed"])
@@ -18,13 +24,7 @@ Three ways in, depending on how much evaluation code you already have.
       a   = p.transform_action(a)                         # actuation
       #     row["language"] is what you pass to the policy # language
 
-  Level 2 -- write a two-method policy and let us drive:
-      class MyPolicy:
-          def reset(self, language: str, *, seed: int) -> None: ...
-          def act(self, agentview, wrist, obs) -> np.ndarray: ...
-      $ libero-ctrl run --policy mymodule:MyPolicy --axis camera --level L2
-
-Every entry point reads the same manifest, so the three give identical rollouts.
+All three read the same manifest, so they give identical rollouts.
 """
 from .benchmark import (  # noqa: F401
     CtrlBenchmark, CtrlEnv, CtrlTask, get_benchmark, get_benchmark_dict,

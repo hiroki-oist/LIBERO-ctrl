@@ -138,8 +138,10 @@ Three things this shows:
 ## The design requirement
 
 **If you already have a working LIBERO evaluation loop, adopting LIBERO-CTRL should cost you
-two lines.** Everything below is built around that constraint. Three entry points are provided,
-in increasing order of how much of your own code you keep.
+two lines.** Everything below is built around that constraint. Three implementations are
+provided, easiest first: the first writes two methods and lets us drive, the second changes two
+lines of an evaluation loop you already have, and the third keeps your harness entirely and
+inserts five hooks into it.
 
 ---
 
@@ -161,59 +163,7 @@ finds them automatically; otherwise set `LIBERO_CTRL_MANIFEST=/path/to/manifests
 
 ---
 
-## Level 0 — swap the benchmark object (2 lines)
-
-```diff
-- from libero.libero import benchmark
-- bm = benchmark.get_benchmark_dict()["libero_spatial"]()
-+ from libero_ctrl import get_benchmark_dict
-+ bm = get_benchmark_dict(split="eval")["libero_ctrl_spatial"]()
-
-  task = bm.get_task(i)
-- env  = OffScreenRenderEnv(bddl_file_name=task.bddl_file, camera_heights=256, camera_widths=256)
-+ env  = bm.make_env(i, camera_heights=256, camera_widths=256)
-  env.reset(); env.set_init_state(bm.get_init_state(i))
-  for t in range(task.max_steps):
-      obs, r, done, info = env.step(policy(obs, task.language))
-```
-
-The index `i` now enumerates `(task × axis × level × config × initial state)` instead of the ten
-LIBERO tasks; `bm.indices(axis=..., level=..., task_id=...)` narrows it. `CtrlEnv` applies every
-perturbation internally:
-
-| axis | where it is applied |
-|---|---|
-| camera, lighting | `sim.model.*` is overwritten after `reset()` |
-| robot | the state handed to `set_init_state` is rebuilt by damped-least-squares IK |
-| sensor | the observation returned by `step()` is degraded |
-| actuation | the action passed to `step()` is transformed |
-| language | `task.language` already contains the perturbed instruction |
-
-Running example: `python examples/01_dropin.py`.
-
-**Why not just ship perturbed BDDL files?** LIBERO-Plus can express its perturbations as scene
-definitions. Two of ours cannot be written in BDDL even in principle: `sensor` degrades the
-observation after rendering, and `actuation` perturbs the action on its way to the controller.
-An env wrapper is the smallest surface that covers all seven axes.
-
-## Level 1 — keep your own loop, add five hooks
-
-If you have a parallel harness, a custom renderer or a vectorised env, you do not have to adopt
-our env at all. Five call sites are the entire contract:
-
-```python
-p = build(PerturbSpec.from_row(row), suite=row["suite"], shape=(H, W))
-p.reset(row["seed"])                              # 1. fix the perturbation's own randomness
-p.apply_model(task)                               # 2. camera / lighting, after env reset
-st = p.transform_init_state(task, st)             # 3. robot initial pose
-img = p.transform_obs(img)                        # 4. sensor
-a   = p.transform_action(a)                       # 5. actuation
-policy.reset(row["language"], seed=row["seed"])   #    language is just this string
-```
-
-Running example: `python examples/02_hooks.py`.
-
-## Level 2 — write a two-method policy and use the CLI
+## Implementation 1 — write a two-method policy, and let the CLI drive
 
 ```python
 class MyPolicy:
@@ -294,6 +244,62 @@ checkpoint that scores 0%, SmolVLA's required `--n_action_steps 1`, OpenVLA-OFT'
 rotation, the CUDA 12.8 torch build that a Blackwell card needs, the canonical-instruction
 manifest MINERVA has to be run with.
 
+Running example: `python -m libero_ctrl.cli run --policy 01_policy_adapter:MyPolicy ...`
+(the file is `examples/01_policy_adapter.py`).
+
+## Implementation 2 — swap the benchmark object (2 lines)
+
+```diff
+- from libero.libero import benchmark
+- bm = benchmark.get_benchmark_dict()["libero_spatial"]()
++ from libero_ctrl import get_benchmark_dict
++ bm = get_benchmark_dict(split="eval")["libero_ctrl_spatial"]()
+
+  task = bm.get_task(i)
+- env  = OffScreenRenderEnv(bddl_file_name=task.bddl_file, camera_heights=256, camera_widths=256)
++ env  = bm.make_env(i, camera_heights=256, camera_widths=256)
+  env.reset(); env.set_init_state(bm.get_init_state(i))
+  for t in range(task.max_steps):
+      obs, r, done, info = env.step(policy(obs, task.language))
+```
+
+The index `i` now enumerates `(task × axis × level × config × initial state)` instead of the ten
+LIBERO tasks; `bm.indices(axis=..., level=..., task_id=...)` narrows it. `CtrlEnv` applies every
+perturbation internally:
+
+| axis | where it is applied |
+|---|---|
+| camera, lighting | `sim.model.*` is overwritten after `reset()` |
+| robot | the state handed to `set_init_state` is rebuilt by damped-least-squares IK |
+| sensor | the observation returned by `step()` is degraded |
+| actuation | the action passed to `step()` is transformed |
+| language | `task.language` already contains the perturbed instruction |
+
+Running example: `python examples/02_dropin.py`.
+
+**Why not just ship perturbed BDDL files?** LIBERO-Plus can express its perturbations as scene
+definitions. Two of ours cannot be written in BDDL even in principle: `sensor` degrades the
+observation after rendering, and `actuation` perturbs the action on its way to the controller.
+An env wrapper is the smallest surface that covers all seven axes.
+
+## Implementation 3 — keep your own loop, add five hooks
+
+If you have a parallel harness, a custom renderer or a vectorised env, you do not have to adopt
+our env at all. Five call sites are the entire contract:
+
+```python
+p = build(PerturbSpec.from_row(row), suite=row["suite"], shape=(H, W))
+p.reset(row["seed"])                              # 1. fix the perturbation's own randomness
+p.apply_model(task)                               # 2. camera / lighting, after env reset
+st = p.transform_init_state(task, st)             # 3. robot initial pose
+img = p.transform_obs(img)                        # 4. sensor
+a   = p.transform_action(a)                       # 5. actuation
+policy.reset(row["language"], seed=row["seed"])   #    language is just this string
+```
+
+Running example: `python examples/03_hooks.py`.
+
+
 ---
 
 ## Reproducibility
@@ -369,10 +375,10 @@ documented in `docs/RUNS.md`.
 ## Layout
 
 ```
-libero_ctrl/        the package: benchmark.py (Level 0), perturb/ (Level 1), cli.py (Level 2)
+libero_ctrl/        the package: cli.py (implementation 1), benchmark.py (2), perturb/ (3)
 manifests/v0.1/     the experiment design — one JSON line per rollout
 calibration/        calibration.json: the σ that define the severity metric
-examples/           the three entry levels, plus the policy servers used for the paper
+examples/           the three implementations, plus the policy servers used for the paper
 setup/              one command per policy: upstream code, environment, checkpoint, and a run
                     — small.sh for a twentieth of the design, gate/eval for all of it
 results/paper/      raw per-rollout records behind the paper

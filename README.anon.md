@@ -163,7 +163,7 @@ manifests/v0.1/     the experiment design: one JSON line per rollout
 calibration/        calibration.json: the σ that define the severity metric
 libero_ctrl/        the package: the env wrapper, the six perturbations, the CLI
 setup/              one command per policy: upstream code, environment, checkpoint, gate
-examples/           the three entry levels, plus the policy servers used for the paper
+examples/           the three implementations, plus the policy servers used for the paper
 docs/               protocol, calibration, what a perturbation looks like, policies, run commands
 ```
 

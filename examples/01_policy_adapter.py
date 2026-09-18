@@ -1,4 +1,4 @@
-"""Level 2 -- touch no env at all; write a policy with two methods.
+"""Implementation 1 -- touch no env at all; write a policy with two methods.
 
     class MyPolicy:
         def reset(self, language: str, *, seed: int) -> None: ...
@@ -6,7 +6,7 @@
 
 That is enough to drive it from the CLI:
 
-    libero-ctrl run --policy 03_policy_adapter:MyPolicy --axis camera --level L2
+    libero-ctrl run --policy 01_policy_adapter:MyPolicy --axis camera --level L2
 
 A policy whose dependencies cannot share a process with the env (a different Python or MuJoCo
 version) uses the unix-socket servers in examples/servers/ instead. The seven policies in the

@@ -1,9 +1,9 @@
-"""Level 1 -- keep your own evaluation loop and insert five hooks.
+"""Implementation 3 -- keep your own evaluation loop and insert five hooks.
 
 Against a typical LIBERO loop the diff is the five marked lines. How the env is built, how the
 policy is called, and how the work is parallelised are all left alone.
 
-Run:  python examples/02_hooks.py
+Run:  python examples/03_hooks.py
 """
 import numpy as np
 from libero_ctrl import PerturbSpec, build, iter_rows
@@ -41,4 +41,4 @@ for row in rows:
     print(f"  {row['rollout_id']:32s} done")
 
 close_task(task)
-print("Level 1 OK")
+print("Implementation 3 OK")

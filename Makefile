@@ -11,10 +11,10 @@ help:
 	@echo "make figs    - re-render docs/figs/perturbation_grid.png (needs a GPU)"
 
 smoke:
-	cd examples && PYTHONPATH=..:. MUJOCO_GL=egl $(PY) 01_dropin.py
-	cd examples && PYTHONPATH=..:. MUJOCO_GL=egl $(PY) 02_hooks.py
+	cd examples && PYTHONPATH=..:. MUJOCO_GL=egl $(PY) 02_dropin.py
+	cd examples && PYTHONPATH=..:. MUJOCO_GL=egl $(PY) 03_hooks.py
 	PYTHONPATH=.:examples MUJOCO_GL=egl $(PY) -m libero_ctrl.cli run \
-	  --policy 03_policy_adapter:MyPolicy --axis camera --level L2 \
+	  --policy 01_policy_adapter:MyPolicy --axis camera --level L2 \
 	  --suite libero_spatial --task 0 --limit 2 --out /tmp/libero_ctrl_smoke
 
 paper:

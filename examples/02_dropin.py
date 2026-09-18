@@ -1,4 +1,4 @@
-"""Level 0 -- swap the benchmark object. The evaluation loop is not rewritten.
+"""Implementation 2 -- swap the benchmark object. The evaluation loop is not rewritten.
 
 Against a standard LIBERO evaluation script the diff is the import and the env construction:
 
@@ -13,7 +13,7 @@ The index i now runs over (task x axis x level x config x initial state) rather 
 LIBERO's ten tasks. Every perturbation is applied inside the env, so the loop below is
 unchanged from an ordinary LIBERO one.
 
-Run:  python examples/01_dropin.py
+Run:  python examples/02_dropin.py
 """
 import numpy as np
 from libero_ctrl import get_benchmark_dict
@@ -49,4 +49,4 @@ for i in idx:
           f"success={env.check_success()}")
     env.close()                           # one env per process: always close it
 
-print("Level 0 OK")
+print("Implementation 2 OK")
