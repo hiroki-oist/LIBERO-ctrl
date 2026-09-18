@@ -1,30 +1,44 @@
-# LIBERO-CTRL
+# LIBERO-CTRL — controlled perturbation for VLA policies
 
-A severity-calibrated, paired, controlled robustness benchmark for vision-language-action policies,
-built on top of [LIBERO](https://github.com/Lifelong-Robot-Learning/LIBERO).
+Seven axes, three severity levels that are *equidistant by construction*, and every rollout paired
+with its own unperturbed twin. Built on
+[LIBERO](https://github.com/Lifelong-Robot-Learning/LIBERO).
 
-LIBERO-CTRL perturbs **seven axes** — camera, lighting, robot initial pose, sensor, actuation,
-language, and their combination — at **three severity levels** that are *equidistant* by
-construction: severity is the Euclidean radius `‖Δp/σ‖₂` in a parameter space normalised by
-per-parameter scales `σ` calibrated once, offline (`calibration/calibration.json`).
-L1, L2 and L3 are radii 2, 4 and 8. Within a level, the individual configurations are
-*directions* on that sphere, so a camera L2 and a lighting L2 are the same distance from nominal.
+The axes are camera, lighting, robot initial pose, sensor, actuation, language, and all six at
+once. Severity is the Euclidean radius `‖Δp/σ‖₂` in a parameter space normalised by per-parameter
+scales `σ` calibrated once, offline (`calibration/calibration.json`); L1, L2 and L3 are the radii
+2, 4 and 8, so a camera L2 and a lighting L2 sit the same distance from nominal. Within a level
+the ten configurations are *directions* on that sphere.
 
 Every rollout is **paired**: the same task, the same initial state, the same policy seed, with and
 without the perturbation. That is what makes the three-term decomposition of
 Section 4 of the paper possible.
 
-## Adopting it costs two lines, five hooks, or two methods
+## Implementation is simple
+
+You bring a policy. What you write depends on what else you already have:
 
 | you already have | you write | |
 |---|---|---|
-| nothing | a class with two methods | [**Implementation 1**](#implementation-1--two-methods-and-the-cli-drives) |
-| a LIBERO evaluation loop | 2 changed lines | [**Implementation 2**](#implementation-2--two-lines) |
-| your own harness — vectorised env, custom renderer | 5 hook calls | [**Implementation 3**](#implementation-3--five-hooks) |
+| a policy, no evaluation loop | a class with two methods | [**Implementation 1**](#implementation-1--two-methods-and-the-cli-drives) |
+| a policy and a LIBERO evaluation loop | 2 changed lines | [**Implementation 2**](#implementation-2--two-lines) |
+| a policy and your own harness — vectorised env, custom renderer | 5 hook calls | [**Implementation 3**](#implementation-3--five-hooks) |
 
-All three read the same manifest, so they produce identical rollouts. Nothing in your LIBERO
-install is touched. One command per policy reproduces the paper's own runs; a twentieth of the
-design takes about an hour.
+All three read the same manifest, so they produce identical rollouts, and none of them touches
+your LIBERO install. Evaluating one of the paper's own policies instead is one command per policy;
+a twentieth of the design takes about an hour.
+
+### Prerequisites
+
+| | |
+|---|---|
+| a policy to evaluate | anything that maps `(agentview, wrist, obs)` to an action — a released checkpoint or your own |
+| a working LIBERO install | the reference environment is `robosuite 1.4.0` / `mujoco 2.3.7` / Python 3.10; `pip install -e .` adds nothing to it |
+| a CUDA GPU | about 16 GB for a 7 B policy, far less for a small one. Rendering is EGL: `MUJOCO_GL=egl` |
+| nothing else | the manifests ship with the repository. No dataset, no demonstrations, no download |
+
+Reproducing the paper's policies with `setup/` needs [`uv`](https://docs.astral.sh/uv/) as well,
+and about 120 GB of disk if you install all six.
 
 ![Each axis at each severity level](docs/figs/perturbation_grid_paper.png)
 
@@ -146,6 +160,36 @@ Three things this shows:
   (`analysis/`, Section 4 of the paper).
 
 ---
+
+---
+
+## Relation to LIBERO-Plus and LIBERO-PRO
+
+LIBERO-Plus perturbs seven dimensions across ten policies and reports drops from above 95% to
+below 30%; LIBERO-PRO argues the same point from task semantics. On the visual and kinematic axes
+our single-axis results agree with theirs: camera viewpoint and initial pose are the most damaging
+for most policies. Three things differ.
+
+- **Severity is shared across axes.** In LIBERO-Plus it is defined per sub-type in each
+  dimension's own units. Here it is a radius in one normalised space, so per-axis sensitivities
+  are comparable and a multi-axis configuration has a defined severity at all.
+- **All six axes at once, on seven policies.** LIBERO-Plus varies one dimension at a time for its
+  main results; its compositional analysis is pairwise, over six dimensions with language
+  excluded, on one policy.
+- **Paired rollouts rather than rates.** Their compositionality measure is rate-level — a
+  covariance of perturbation indicators conditioned on success. The departure of a multi-factor
+  rate from a single-factor prediction is the sum of three terms, and no rate-level statistic can
+  isolate the one that reports interaction; that needs the same initial state followed across
+  conditions.
+
+One result disagrees. LIBERO-Plus reports the language axis as nearly inert and reads that as
+policies underusing the language channel. Under this protocol it is the most policy-discriminating
+of the seven axes, costing between 0.7 and 79.0 points, and our paraphrases are the milder ones —
+every content word preserved, where theirs replace object nouns. We report the discrepancy without
+being able to resolve it from the published description. Measuring this axis does require the
+perturbed instruction to reach the policy, which an evaluation harness that also supplies a
+canonical task string can silently prevent; `docs/PROTOCOL.md` gives the check we run for every
+policy.
 
 ---
 
