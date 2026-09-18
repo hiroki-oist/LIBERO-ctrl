@@ -85,12 +85,18 @@ the instruction. Both are given in full below.
 | L2 | pick up the salad dressing and put it into the basket |
 | L3 | find the salad dressing, pick it up, and then place it into the basket |
 
-### combination — all six axes applied at once
+### combination — all six axes applied at once, or any subset
 
 Configuration *j* of the combination axis bundles configuration *j* of every axis, which
 is why the bottom row of the figure is the superposition of the five rows above it plus
 the paraphrase. Six axes each at radius *r* sit at `√6·r` in the joint space, so
 combination L1 is already a longer displacement than any single-axis L3.
+
+`libero-ctrl run --combine camera,lighting` runs a chosen subset instead. It reuses these same
+rows and drops the axes it was not asked for, so a subset keeps the shared initial state and the
+per-axis parameters of the full condition; `k` axes at radius `r` sit at `√k·r`. The records land
+under their own `rollout_id` namespace (`.../comb-camera+lighting/...`) and carry the subset in a
+`combine` field, so they never mix with the six-axis ones.
 
 ---
 

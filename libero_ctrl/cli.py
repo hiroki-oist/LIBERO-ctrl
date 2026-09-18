@@ -40,6 +40,46 @@ def _done_ids(out_dir: str) -> set:
     return got
 
 
+def _combine(rows, axes):
+    """Rows for a chosen subset of the axes, applied simultaneously.
+
+    The manifest's `combination` rows already carry one parameter dict per axis, and every axis
+    of a row shares the initial state, so a subset is the same row with the other axes dropped.
+    Severity follows: k axes at radius r sit at sqrt(k)*r in the joint space, where the shipped
+    combination axis is sqrt(6)*r.
+
+    The rollout ids are given their own namespace so these records never mix with the six-axis
+    ones, and each record carries the subset it was run with.
+    """
+    want = [a.strip() for a in axes.split(",") if a.strip()]
+    known = ("camera", "lighting", "robot", "sensor", "actuation", "language")
+    bad = [a for a in want if a not in known]
+    if bad:
+        raise SystemExit(f"--combine: unknown axis {bad[0]}. Choose from {', '.join(known)}.")
+    if len(want) < 2:
+        raise SystemExit("--combine takes at least two axes; a single axis is the axis itself.")
+
+    canonical = {}          # (suite, task) -> the unperturbed instruction
+    for r in rows:
+        if r["axis"] not in ("language", "combination"):
+            canonical.setdefault((r["suite"], r["task_id"]), r["language"])
+    tag = "+".join(want)
+    out = []
+    for r in rows:
+        if r["axis"] != "combination":
+            continue
+        row = dict(r)
+        row["perturb"] = {a: p for a, p in (r.get("perturb") or {}).items() if a in want}
+        if "language" not in want:
+            row["language"] = canonical.get((r["suite"], r["task_id"]), r["language"])
+        row["combine"] = want
+        row["rollout_id"] = r["rollout_id"].replace("/combination/", f"/comb-{tag}/")
+        out.append(row)
+    if not out:
+        raise SystemExit("--combine needs the eval split, which is where the combination rows are.")
+    return out
+
+
 def _subsample(rows, frac):
     """A random fraction of the design, drawn as whole paired units.
 
@@ -91,6 +131,7 @@ def cmd_run(a):
     rows = [r for r in iter_rows(a.split, path=a.rows, axis=axis, level=a.level,
                                  suite=(a.suite.split(",") if a.suite else None),
                                  task_id=([int(x) for x in a.task.split(",")] if a.task else None))]
+    if a.combine: rows = _combine(rows, a.combine)
     if a.limit: rows = rows[:a.limit]
     if a.sample: rows = _subsample(rows, a.sample)
     if a.shard:
@@ -177,6 +218,10 @@ def main(argv=None):
                    help="a manifest file to use instead of the split's own; "
                         "manifests/v0.1/minerva_recollect.jsonl is the eval design with the "
                         "canonical instruction, for a policy that cannot accept a paraphrase")
+    r.add_argument("--combine", default=None, metavar="AXES",
+                   help="apply a chosen subset of the axes simultaneously, e.g. "
+                        "--combine camera,lighting. Reuses the combination rows, so the subset "
+                        "keeps the shared initial state and the matched severity")
     r.add_argument("--sample", type=float, default=None, metavar="FRAC",
                    help="run a random FRAC of the design, drawn as whole paired units. "
                         "Unseeded: every run draws a different subset. FRAC must divide each "

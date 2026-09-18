@@ -53,6 +53,8 @@ def run_rollout(task, row: dict, policy, *, res: int) -> dict:
     out = dict(rollout_id=row["rollout_id"], success=bool(ok), steps=int(steps),
                axis=row["axis"], level=row["level"], suite=row["suite"],
                task_id=row["task_id"], init_id=row["init_id"], config=row.get("config"))
+    if row.get("combine"):
+        out["combine"] = list(row["combine"])
     if getattr(p, "ik_res_mm", None) is not None:
         out["ik_res_mm"] = round(float(p.ik_res_mm), 4)
     return out

@@ -165,31 +165,45 @@ Three things this shows:
 
 ## Relation to LIBERO-Plus and LIBERO-PRO
 
-LIBERO-Plus perturbs seven dimensions across ten policies and reports drops from above 95% to
-below 30%; LIBERO-PRO argues the same point from task semantics. On the visual and kinematic axes
-our single-axis results agree with theirs: camera viewpoint and initial pose are the most damaging
-for most policies. Three things differ.
+**LIBERO-Plus** asks the same question and overlaps on five axes — camera, lighting, robot
+initial state, sensor and language. It also perturbs object layout and background texture, which
+we do not; we perturb actuation, which it does not. Our single-axis results agree with theirs
+where the axes coincide: camera viewpoint and initial pose are the most damaging for most
+policies. Three things differ by design.
 
-- **Severity is shared across axes.** In LIBERO-Plus it is defined per sub-type in each
-  dimension's own units. Here it is a radius in one normalised space, so per-axis sensitivities
-  are comparable and a multi-axis configuration has a defined severity at all.
-- **All six axes at once, on seven policies.** LIBERO-Plus varies one dimension at a time for its
-  main results; its compositional analysis is pairwise, over six dimensions with language
-  excluded, on one policy.
-- **Paired rollouts rather than rates.** Their compositionality measure is rate-level — a
-  covariance of perturbation indicators conditioned on success. The departure of a multi-factor
-  rate from a single-factor prediction is the sum of three terms, and no rate-level statistic can
-  isolate the one that reports interaction; that needs the same initial state followed across
-  conditions.
+- **A level means something else there.** LIBERO-Plus stratifies its cases by how many of four
+  reference policies solved each one — level 1 is solved by all four, level 5 by none. That is an
+  outcome class defined by a particular model set, so it moves if the set changes and it is not a
+  magnitude of intervention. Here a level is a radius in a normalised parameter space, fixed
+  before any policy is run, and identical across axes.
+- **One factor at a time.** Its main results vary one dimension; its compositional analysis is
+  pairwise, over six dimensions with language excluded, on one policy. Here all six axes are
+  applied at once at matched severity, on seven policies — and `--combine` runs any subset.
+- **Rate-level statistics.** Its compositionality measure is a covariance of perturbation
+  indicators conditioned on success. A rate cannot separate cross-axis dependence from
+  superposition; that needs the same initial state followed across conditions, which is what the
+  paired design here provides.
 
-One result disagrees. LIBERO-Plus reports the language axis as nearly inert and reads that as
-policies underusing the language channel. Under this protocol it is the most policy-discriminating
-of the seven axes, costing between 0.7 and 79.0 points, and our paraphrases are the milder ones —
-every content word preserved, where theirs replace object nouns. We report the discrepancy without
-being able to resolve it from the published description. Measuring this axis does require the
-perturbed instruction to reach the policy, which an evaluation harness that also supplies a
-canonical task string can silently prevent; `docs/PROTOCOL.md` gives the check we run for every
-policy.
+The language axis is where the two disagree outright. LIBERO-Plus reports it as nearly inert and
+reads that as policies underusing the language channel; under this protocol it is the most
+policy-discriminating of the seven axes, costing between 0.7 and 79.0 points, with paraphrases
+that preserve every content word where theirs replace object nouns. Open reports on their
+repository describe variant metadata being appended to the instruction that reaches the policy —
+one measured at 8.08 points on π₀.₅ — and a reproduction of π₀ under sensor noise far below the
+published value. We cannot resolve the disagreement from outside, so we do two things instead:
+`docs/PROTOCOL.md` documents the check that catches this class of failure, which is that the
+perturbed instruction must reach the policy and be the only thing that changed, and every rollout
+behind our numbers is in `results/paper/`.
+
+**LIBERO-PRO** is after something else: memorisation. It changes object appearance and scale,
+object placement, the instruction — including redefining the task — and swaps the working
+environment, and reports policies collapsing to near zero while their trajectories stay the same.
+The overlap with us is the instruction axis alone. Its harness evaluates one perturbation type at
+a time (task perturbation cannot be combined at all), severity is a per-dimension threshold rather
+than a shared scale, and results are rates over 50 episodes per task without paired rollouts. The
+two benchmarks answer different questions: whether a policy has memorised its scene, and how far
+its competence extends as a controlled deviation grows.
+
 
 ---
 
@@ -226,6 +240,9 @@ libero-ctrl gate --results out/ --published 97.1                                
   in. Checkpoints disagree — OpenVLA-OFT wants a 180° rotation — so the benchmark does not guess:
   convert inside `act()`.
 - `--shard i/N` splits by task; a re-run resumes, skipping written `rollout_id`s.
+- `--combine camera,lighting` applies any subset of the axes simultaneously, reusing the
+  combination rows so the subset keeps the shared initial state and the matched severity. `k` axes
+  at radius `r` sit at `√k·r`, where the shipped combination axis is `√6·r`.
 - If your policy cannot share a process with LIBERO, run it in its own venv behind a unix socket
   (`examples/servers/`, length-prefixed JSON, never pickle):
 
