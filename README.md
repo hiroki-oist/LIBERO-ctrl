@@ -184,16 +184,19 @@ policies. Three things differ by design.
   superposition; that needs the same initial state followed across conditions, which is what the
   paired design here provides.
 
-The language axis is where the two disagree outright. LIBERO-Plus reports it as nearly inert and
-reads that as policies underusing the language channel; under this protocol it is the most
-policy-discriminating of the seven axes, costing between 0.7 and 79.0 points, with paraphrases
-that preserve every content word where theirs replace object nouns. Open reports on their
-repository describe variant metadata being appended to the instruction that reaches the policy —
-one measured at 8.08 points on π₀.₅ — and a reproduction of π₀ under sensor noise far below the
-published value. We cannot resolve the disagreement from outside, so we do two things instead:
-`docs/PROTOCOL.md` documents the check that catches this class of failure, which is that the
-perturbed instruction must reach the policy and be the only thing that changed, and every rollout
-behind our numbers is in `results/paper/`.
+The language axis needs care in comparison, because the two policy sets overlap in only two
+places. On those two — OpenVLA-OFT and UniVLA — we measure 7.0 and 5.4 points of loss at L3,
+which is mild, and consistent with LIBERO-Plus reading the axis as nearly inert on its own set.
+What a wider size range adds is that the axis is not mild everywhere: the 450 M policy loses 54.8
+points and the 0.68 M one 79.0, under paraphrases that preserve every content word. The axis
+separates policies rather than being uniformly weak, and neither reading contradicts the other.
+
+Independently of the policy set, the axis only measures anything if the perturbed instruction is
+what reaches the policy and is the only thing that changed. Open reports on the LIBERO-Plus
+repository describe variant metadata being appended to the instruction — one measured at 8.08
+points on π₀.₅ — which is the same failure mode we had to guard against ourselves.
+`docs/PROTOCOL.md` documents the check, and every rollout behind our numbers is in
+`results/paper/`.
 
 **LIBERO-PRO** is after something else: memorisation. It changes object appearance and scale,
 object placement, the instruction — including redefining the task — and swaps the working
