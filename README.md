@@ -4,6 +4,12 @@ Seven axes, three severity levels that are *equidistant by construction*, and ev
 with its own unperturbed twin. Built on
 [LIBERO](https://github.com/Lifelong-Robot-Learning/LIBERO).
 
+**[Project page](https://hiroki-oist.github.io/LIBERO-ctrl/) ·
+[Paper — arXiv:2609.15940](https://arxiv.org/abs/2609.15940) ·
+[2-minute video](docs/video/libero_ctrl_promo.mp4)**
+
+[![Two-minute video: what LIBERO-CTRL is, how it differs from LIBERO-Plus and LIBERO-PRO, and how seven policies survived it](docs/video/poster.png)](docs/video/libero_ctrl_promo.mp4)
+
 The axes are camera, lighting, robot initial pose, sensor, actuation, language, and all six at
 once. Severity is the Euclidean radius `‖Δp/σ‖₂` in a parameter space normalised by per-parameter
 scales `σ` calibrated once, offline (`calibration/calibration.json`); L1, L2 and L3 are the radii
@@ -421,6 +427,22 @@ results/paper/      raw per-rollout records behind the paper
 analysis/           table and figure generation
 docs/               protocol, calibration, what a perturbation looks like,
                     policies, exact run commands
+```
+
+## Citation
+
+If you use LIBERO-CTRL — the manifests, the code, or the released rollout records — please cite
+the paper:
+
+```bibtex
+@article{sawada2026libero_ctrl,
+  title   = {Beyond Single-Axis Testing: Paired Evaluation of Compound Robustness
+             in Vision-Language-Action Policies},
+  author  = {Sawada, Hiroki and Kasahara, Shunichi},
+  journal = {arXiv preprint arXiv:2609.15940},
+  year    = {2026},
+  url     = {https://arxiv.org/abs/2609.15940}
+}
 ```
 
 ## License

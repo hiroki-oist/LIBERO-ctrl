@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LIBERO-CTRL</title>
+<meta name="description" content="LIBERO-CTRL: controlled perturbation for vision-language-action policies. Six single-axis and one simultaneous perturbation axis, three controlled severity levels, every condition paired on the same initial state.">
+<meta property="og:title" content="LIBERO-CTRL — controlled perturbation for VLA policies">
+<meta property="og:description" content="Beyond Single-Axis Testing: Paired Evaluation of Compound Robustness in Vision-Language-Action Policies.">
+<meta property="og:image" content="https://hiroki-oist.github.io/LIBERO-ctrl/video/poster.png">
+<meta property="og:type" content="website">
+<style>
+  :root { --bg:#f5f5f4; --ink:#1f1f1f; --muted:#6b6f73; --rule:#cdd0d3; --blue:#3d6fa8; --red:#c44e52; --card:#ffffff; }
+  * { box-sizing: border-box; }
+  html, body { margin:0; background:var(--bg); color:var(--ink); font: 17px/1.55 "Helvetica Neue", Helvetica, Arial, "Nimbus Sans", sans-serif; }
+  a { color: var(--blue); text-decoration: none; } a:hover { text-decoration: underline; }
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 0 16px; }
+  header { padding: 64px 0 24px; text-align: center; }
+  h1 { font-size: clamp(30px, 5vw, 46px); line-height: 1.15; margin: 0 0 10px; letter-spacing: -0.01em; }
+  h1 small { display:block; font-size: 0.62em; font-weight: 400; color: var(--muted); margin-top: 8px; }
+  .authors { font-size: 20px; margin: 18px 0 4px; } .affil { color: var(--muted); }
+  .links { margin: 26px 0 0; display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+  .links a { border: 1.5px solid var(--ink); border-radius: 999px; padding: 8px 18px; color: var(--ink); font-weight: 600; }
+  .links a.primary { background: var(--ink); color: #fff; }
+  .links a:hover { text-decoration: none; background: var(--ink); color: #fff; }
+  section { padding: 40px 0 8px; }
+  h2 { font-size: 28px; margin: 0 0 14px; letter-spacing: -0.01em; }
+  h3 { font-size: 20px; margin: 22px 0 6px; }
+  p.lead { font-size: 19px; }
+  video, img.fig { width: 100%; display: block; border: 1px solid var(--rule); background: #fff; }
+  figcaption { color: var(--muted); font-size: 15px; margin-top: 8px; }
+  .claims { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin: 22px 0 0; }
+  .claim { background: var(--card); border: 1px solid var(--rule); padding: 16px 18px; }
+  .claim b { display:block; font-size: 30px; line-height: 1.1; margin-bottom: 6px; }
+  .claim span { color: var(--muted); font-size: 15px; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; } @media (max-width: 760px) { .two { grid-template-columns: 1fr; } }
+  table { border-collapse: collapse; width: 100%; font-size: 15px; margin: 14px 0; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; }
+  td.ctrl { font-weight: 600; }
+  pre { background: #ecece9; padding: 14px 16px; overflow-x: auto; font: 14.5px/1.5 ui-monospace, "SF Mono", Menlo, Consolas, monospace; margin: 10px 0 18px; }
+  .ef { color: var(--red); font-weight: 600; } .cs { color: var(--blue); font-weight: 600; }
+  .num { font-size: 40px; font-weight: 700; line-height: 1; }
+  .callout { border-left: 4px solid var(--ink); padding: 8px 18px; margin: 18px 0; background: var(--card); }
+  footer { color: var(--muted); font-size: 14px; padding: 40px 0 60px; border-top: 1px solid var(--rule); margin-top: 40px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>Beyond Single-Axis Testing: Paired Evaluation of Compound Robustness in Vision-Language-Action Policies
+    <small>LIBERO-CTRL — controlled perturbation for VLA policies, built on LIBERO</small></h1>
+  <div class="authors">Hiroki Sawada &middot; Shunichi Kasahara</div>
+  <div class="affil">Sony Computer Science Laboratories, Inc.</div>
+  <div class="links">
+    <a class="primary" href="https://arxiv.org/abs/2609.15940">Paper (arXiv:2609.15940)</a>
+    <a href="https://github.com/hiroki-oist/LIBERO-ctrl">Code &amp; data</a>
+    <a href="#video">Video</a>
+    <a href="#cite">Cite</a>
+  </div>
+</header>
+
+<section id="video">
+  <video controls preload="metadata" poster="video/poster.png" src="video/libero_ctrl_promo.mp4"></video>
+  <figcaption>Two minutes: what the benchmark is, how it differs from LIBERO-Plus and LIBERO-PRO, and how seven policies survived it.</figcaption>
+
+  <div class="claims">
+    <div class="claim"><b>6 + 1</b><span>single-axis perturbation axes — camera, lighting, robot pose, sensor, actuation, language — and all six at once</span></div>
+    <div class="claim"><b>3</b><span>controlled severity levels: L1, L2, L3 are distances 2, 4, 8 in a parameter space normalised per axis — the same distance on every axis</span></div>
+    <div class="claim"><b>7</b><span>conditions per initial state, 400 matched task–configuration pairs per level, all from the same initial state</span></div>
+    <div class="claim"><b>7</b><span>policies pre-inspected: π<sub>0.5</sub>, OpenVLA-OFT, UniVLA, SmolVLA, VLA-JEPA, PredVLA, MINERVA — 72,800 rollouts, every record released</span></div>
+  </div>
+</section>
+
+<section>
+  <h2>Why</h2>
+  <p class="lead">Vision-language-action policies are typically evaluated one perturbation at a time, providing a useful diagnosis of their sensitivity to individual distribution shifts. Real-world deployment, however, may involve several shifts simultaneously, and it remains unclear how these individual robustness measurements compose.</p>
+  <p>LIBERO-CTRL asks two questions. Does robustness to each perturbation alone predict robustness to all of them together? And what happens to individual initial states when the perturbations are combined? To answer them, every initial state is run under six single-axis conditions and one simultaneous condition, so outcomes can be compared state by state rather than only as success rates.</p>
+  <figure>
+    <img class="fig" src="figs/perturbation_grid_paper.png" alt="One initial state under each axis at each severity level">
+    <figcaption>One task, one initial state, one configuration, at each severity level. Actuation changes no pixel, so it is shown as the end-effector path and the tracking error it costs.</figcaption>
+  </figure>
+</section>
+
+<section>
+  <h2>How existing policies survived</h2>
+  <figure>
+    <img class="fig" src="figs/axis_grid.png" alt="Success rate by policy and axis, clean to L3">
+    <figcaption>One cell per policy and axis, n = 400 per level. The dashed line is the policy's own nominal score; the shaded area is what the axis takes away.</figcaption>
+  </figure>
+  <ul>
+    <li><b>Which axis hurts most is not shared.</b> Camera is the most damaging axis for most policies — UniVLA falls from 94% to 4% at L3 — but OpenVLA-OFT suffers most from the robot's initial pose (45%), and lighting, harmless to the others, takes MINERVA to 12%.</li>
+    <li><b>Language is mild for the large models and fatal for PredVLA</b> (1.8% at L1).</li>
+    <li><b>All six at once collapses everyone:</b> below 20% at L3 for every policy, even the strongest.</li>
+  </ul>
+</section>
+
+<section>
+  <h2>What only the pairing can measure</h2>
+  <div class="two">
+    <div>
+      <p>Two policies can have the same single-axis and simultaneous success rates and behave completely differently. For UniVLA at L1, S<sub>conj</sub> = 50.5% and S<sub>sim</sub> = 46.5% — four points apart, a difference not statistically distinguishable from zero — yet <b>66</b> of 400 initial states succeed under every single-axis condition and fail simultaneously (<span class="ef">emergent failures</span>), and <b>50</b> do the opposite (<span class="cs">compensated successes</span>). 29% of the initial states changed outcome; the aggregate hides it.</p>
+      <p>Counting both transitions across policies, the disagreement rate R<sub>e</sub> + R<sub>c</sub> reaches <span class="num">34.5%</span> of matched pairs at L2 (VLA-JEPA; π<sub>0.5</sub> 33.5%): one matched pair in three changes outcome between the single-axis conditions and the simultaneous one.</p>
+    </div>
+    <div>
+      <p>The gap from the independence prediction S<sub>indep</sub> (the product of the six single-axis rates) to S<sub>sim</sub> splits into two steps: <b>D</b> = S<sub>conj</sub> − S<sub>indep</sub>, cross-axis dependence, positive for every policy at every level — failures cluster on the same initial states; and <b>I</b> = S<sub>sim</sub> − S<sub>conj</sub> = R<sub>c</sub> − R<sub>e</sub>, the superposition effect, which turns negative as severity rises — the simultaneous condition removes successes that every single-axis condition had kept.</p>
+      <div class="callout"><b>Compound robustness cannot be inferred from aggregate single-axis success alone.</b> Matched evaluation reveals how outcomes actually change.</div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>Compared with LIBERO-Plus and LIBERO-PRO</h2>
+  <table>
+    <tr><th></th><th>LIBERO-Plus</th><th>LIBERO-PRO</th><th>LIBERO-CTRL</th></tr>
+    <tr><td>severity</td><td>levels set after the fact, from how many of four reference policies solved each case</td><td>no graded severity</td><td class="ctrl">a controlled distance in parameter space, the same on every axis</td></tr>
+    <tr><td>compound perturbation</td><td>one combined condition, with its own rollouts</td><td>one perturbation at a time</td><td class="ctrl">six single-axis conditions and the simultaneous one, from the same initial state</td></tr>
+    <tr><td>reports</td><td>success rates</td><td>success rates</td><td class="ctrl">what happens to each initial state</td></tr>
+  </table>
+  <p>A success rate says how many initial states succeed. Only the pairing says which ones changed.</p>
+</section>
+
+<section>
+  <h2>Easy to implement, easy to reproduce</h2>
+  <p><code>pip install -e .</code> into the LIBERO environment you already have — nothing else is touched. No dataset, no download: the manifests ship with the repository.</p>
+  <div class="two">
+    <div>
+      <h3>You have a policy — two methods</h3>
+<pre>class MyPolicy:
+    def reset(self, language, *, seed): ...
+    def act(self, agentview, wrist, obs): ...
+
+libero-ctrl run --policy mymod:MyPolicy --level L1 --out out/</pre>
+      <h3>You have a LIBERO evaluation loop — two lines</h3>
+<pre>- bm = benchmark.get_benchmark_dict()["libero_spatial"]()
++ bm = get_benchmark_dict(split="eval")["libero_ctrl_spatial"]()</pre>
+      <p>Your own harness: five hook calls. Details in the <a href="https://github.com/hiroki-oist/LIBERO-ctrl#implementation-is-simple">README</a>.</p>
+    </div>
+    <div>
+      <h3>Reproduce a paper policy — one command each</h3>
+<pre>bash setup/ctrl.sh install            # once
+bash setup/lerobot.sh pi05 install    # environment + checkpoint
+bash setup/small.sh pi05              # 1/20 of the design, ~1 h
+bash setup/lerobot.sh pi05 eval       # the full design</pre>
+      <h3>Reproduce the paper — from the released records</h3>
+<pre>make paper     # every table and figure
+make verify    # every number the paper states</pre>
+    </div>
+  </div>
+</section>
+
+<section id="cite">
+  <h2>Citation</h2>
+<pre>@article{sawada2026libero_ctrl,
+  title   = {Beyond Single-Axis Testing: Paired Evaluation of Compound Robustness
+             in Vision-Language-Action Policies},
+  author  = {Sawada, Hiroki and Kasahara, Shunichi},
+  journal = {arXiv preprint arXiv:2609.15940},
+  year    = {2026},
+  url     = {https://arxiv.org/abs/2609.15940}
+}</pre>
+</section>
+
+<footer>
+  LIBERO-CTRL is MIT-licensed and builds on <a href="https://github.com/Lifelong-Robot-Learning/LIBERO">LIBERO</a> and robosuite.
+  Code, manifests, the calibration and every rollout record: <a href="https://github.com/hiroki-oist/LIBERO-ctrl">github.com/hiroki-oist/LIBERO-ctrl</a>.
+</footer>
+
+</div>
+</body>
+</html>
