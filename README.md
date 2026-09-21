@@ -6,7 +6,8 @@ with its own unperturbed twin. Built on
 
 **[Project page](https://hiroki-oist.github.io/LIBERO-ctrl/) ·
 [Paper — arXiv:2609.15940](https://arxiv.org/abs/2609.15940) ·
-[2-minute video](docs/video/libero_ctrl_promo.mp4)**
+[2-minute video](docs/video/libero_ctrl_promo.mp4) ·
+[10-minute walkthrough (YouTube)](https://youtu.be/0A1isWamxLs)**
 
 [![Two-minute video: what LIBERO-CTRL is, how it differs from LIBERO-Plus and LIBERO-PRO, and how seven policies survived it](docs/video/poster.png)](docs/video/libero_ctrl_promo.mp4)
 
